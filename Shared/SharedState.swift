@@ -9,22 +9,33 @@ struct WidgetState: Codable {
     var openCount: Int { sessions.reduce(0) { $0 + $1.openCount } }
 
     static let empty = WidgetState(updatedAt: .now, ticker: "", sessions: [])
+    /// Fictional data for the widget gallery placeholder and the README screenshots.
     static let sample = WidgetState(
         updatedAt: .now,
-        ticker: ">UI KURULUYOR  *  TEST ET",
+        ticker: "",
         sessions: [
-            TodoSession(id: "a", title: "Ses modeli", cwd: "", items: [
-                TodoItem(id: "0", content: "Gradio arayüzünü yaz", activeForm: "Gradio arayüzü yazılıyor", status: .inProgress),
-                TodoItem(id: "1", content: "README hazırla", activeForm: "README", status: .pending),
-                TodoItem(id: "2", content: "GitHub'ı public aç", activeForm: "GitHub", status: .pending),
-            ], updatedAt: .now, auto: true),
-            TodoSession(id: "b", title: "Harness", cwd: "", items: [
-                TodoItem(id: "0", content: "ngrok alan adını bağla", activeForm: "ngrok bağlanıyor", status: .inProgress),
-                TodoItem(id: "1", content: "Google OAuth kur", activeForm: "OAuth", status: .pending),
-            ], updatedAt: .now, auto: true),
-            TodoSession(id: "c", title: "Benim", cwd: "", items: [
-                TodoItem(id: "0", content: "Diş hekimi randevusu", activeForm: "Randevu", status: .pending),
-            ], updatedAt: .now),
+            TodoSession(id: "demo-1", title: "Checkout", cwd: "", items: [
+                TodoItem(id: "0", content: "Approve the pricing copy", activeForm: "Approve the pricing copy", status: .pending,
+                         detail: "Claude drafted three variants and is waiting for your pick.", needsYou: true),
+                TodoItem(id: "1", content: "Fix failing Stripe webhook test", activeForm: "Fix failing Stripe webhook test", status: .inProgress,
+                         detail: "The retry test times out after the new signature check."),
+                TodoItem(id: "2", content: "Update the order confirmation email", activeForm: "Update the order confirmation email", status: .pending,
+                         detail: "Template still shows the old shipping estimate."),
+            ], updatedAt: .now.addingTimeInterval(-5 * 60)),
+            TodoSession(id: "demo-2", title: "API v2", cwd: "", items: [
+                TodoItem(id: "0", content: "Rotate the staging API key", activeForm: "Rotate the staging API key", status: .pending,
+                         detail: "The key was pasted into the chat; create a new one.", needsYou: true),
+                TodoItem(id: "1", content: "Run the v2 schema migration", activeForm: "Run the v2 schema migration", status: .pending,
+                         detail: "Dry run passed; waiting for the go-ahead."),
+            ], updatedAt: .now.addingTimeInterval(-42 * 60)),
+            TodoSession(id: "demo-3", title: "Docs", cwd: "", items: [
+                TodoItem(id: "0", content: "Finish the install guide", activeForm: "Finish the install guide", status: .pending,
+                         detail: "Linux and Windows sections are still empty."),
+            ], updatedAt: .now.addingTimeInterval(-3 * 3600), live: false),
+            TodoSession(id: "demo-4", title: "Onboarding flow", cwd: "", items: [
+                TodoItem(id: "0", content: "Choose the empty-state illustration", activeForm: "Choose the empty-state illustration", status: .pending,
+                         detail: "Two options generated; needs your decision.", needsYou: true),
+            ], updatedAt: .now.addingTimeInterval(-2 * 24 * 3600), live: false),
         ])
 }
 

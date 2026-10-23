@@ -33,10 +33,10 @@ struct TodoPanel: View {
     private var tabs: some View {
         ScrollViewReader { proxy in
             HStack(spacing: 4) {
-                arrow("chevron.left") { step(-1, proxy) }
+                if !preview { arrow("chevron.left") { step(-1, proxy) } }
                 scroll(.horizontal) {
                     HStack(spacing: 6) {
-                        ForEach(store.sessions) { session in
+                        ForEach(previewTabs) { session in
                             let isSelected = session.id == store.selected?.id
                             Button { store.selectedID = session.id } label: {
                                 HStack(spacing: 5) {
@@ -59,12 +59,17 @@ struct TodoPanel: View {
                         }
                     }
                 }
-                arrow("chevron.right") { step(1, proxy) }
+                if !preview { arrow("chevron.right") { step(1, proxy) } }
             }
             .onChange(of: store.selected?.id) { _, id in
                 if let id { withAnimation { proxy.scrollTo(id, anchor: .center) } }
             }
         }
+    }
+
+    /// ImageRenderer cannot scroll, so a preview shows only the tabs that fit.
+    private var previewTabs: [TodoSession] {
+        preview ? Array(store.sessions.filter { $0.id != TodoStore.manualID }.prefix(3)) : store.sessions
     }
 
     private func arrow(_ name: String, action: @escaping () -> Void) -> some View {

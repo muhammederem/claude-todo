@@ -103,6 +103,9 @@ final class TodoStore: ObservableObject {
         }
     }
 
+    /// Screenshot mode: show fictional sessions instead of the real ones.
+    func loadDemo() { transcript = WidgetState.sample.sessions; selectedID = transcript.first?.id }
+
     func refreshNow() {
         let scanned = scanner.scan()
         fingerprints = Dictionary(scanned.map { ($0.id, $0.fingerprint) }, uniquingKeysWith: { $1 })

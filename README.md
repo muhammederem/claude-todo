@@ -8,6 +8,13 @@ A menu bar app and desktop widget that shows what is still unfinished across you
 - Mark a task done, hide a tab, and add your own tasks in the "Mine" tab.
 - Optional notification when something has been waiting on you for 15 minutes.
 
+<p align="center">
+  <img src="docs/widgets.png" alt="Small, medium and large desktop widgets" width="640"><br>
+  <img src="docs/panel.png" alt="Menu bar panel" width="300">
+</p>
+
+*Screenshots use made-up sample sessions.*
+
 ## Install
 
 Homebrew (once a release is published):

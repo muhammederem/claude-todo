@@ -34,9 +34,8 @@ struct ClaudeTodoApp: App {
 enum Snapshot {
     /// `--snapshot-widget out.png`: the three widget sizes with real data, side by side.
     static func writeWidgets(to path: String) {
-        let store = TodoStore(autoRefresh: false)
-        store.refreshNow()
-        let state = SharedState.read() ?? .sample
+        let demo = CommandLine.arguments.contains("--demo")
+        let state = demo ? .sample : (SharedState.read() ?? .sample)
         let entry = TodoEntry(date: Date(timeIntervalSinceReferenceDate: 800_000_000), state: state, selectedID: nil)
         func card(_ family: WidgetFamily, _ w: CGFloat, _ h: CGFloat) -> some View {
             TodoWidgetView(entry: entry, preview: true, familyOverride: family)
@@ -64,10 +63,10 @@ enum Snapshot {
 
     static func write(to path: String) {
         let store = TodoStore(autoRefresh: false)
-        store.refreshNow()
+        if CommandLine.arguments.contains("--demo") { store.loadDemo() } else { store.refreshNow() }
         let content = VStack(spacing: 8) {
             MenuBarTicker(store: store, clock: TickerClock())
-            TodoPanel(store: store, preview: true).frame(width: 300, height: 320)
+            TodoPanel(store: store, preview: true).frame(width: 320, height: 420)
         }
         .padding(8).background(Color(white: 0.2))
         let renderer = ImageRenderer(content: content)

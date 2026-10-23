@@ -183,7 +183,7 @@ struct TodoWidgetView: View {
             }
             Spacer(minLength: 0)
         }
-        if let s = selected, s.id != "manual", family != .systemSmall, let url = Look.resumeURL(s.id) {
+        if !preview, let s = selected, s.id != "manual", family != .systemSmall, let url = Look.resumeURL(s.id) {
             Link(destination: url) { content }
         } else {
             content
