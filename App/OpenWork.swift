@@ -7,6 +7,8 @@ struct TurnInfo {
     var lastAssistant = ""
     var stopReason: String?
     var todos: [TodoItem]?
+    /// What the last tool call or reply was about ("Editing TodoPanel.swift"); shown while a session is busy.
+    var activity = ""
 }
 
 /// Finds unfinished work in a conversation without calling any model: a real TodoWrite list wins,

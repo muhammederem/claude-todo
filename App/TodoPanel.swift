@@ -41,7 +41,7 @@ struct TodoPanel: View {
                             Button { store.selectedID = session.id } label: {
                                 HStack(spacing: 5) {
                                     if session.id != TodoStore.manualID {
-                                        Circle().fill(isSelected ? Color.black.opacity(0.55) : session.live ? Look.accent : Look.dim)
+                                        Circle().fill(isSelected ? Color.black.opacity(0.55) : session.busy ? Look.amber : session.live ? Look.accent : Look.dim)
                                             .frame(width: 6, height: 6)
                                     }
                                     Text(session.title).lineLimit(1)
@@ -103,8 +103,17 @@ struct TodoPanel: View {
                 }
                 .foregroundStyle(n == 0 ? Look.accent : Look.text)
                 if !isManual { sessionHeader(session) }
+                if session.busy, !session.nowDoing.isEmpty {
+                    HStack(spacing: 6) {
+                        Image(systemName: "bolt.fill").font(.system(size: 10)).foregroundStyle(Look.amber)
+                        Text(session.nowDoing).font(.system(size: 12, weight: .medium)).foregroundStyle(Look.amber).lineLimit(2)
+                    }
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Look.amber.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                }
                 if session.items.isEmpty {
-                    Text(isManual ? "Nothing yet. Add a task below." : session.analyzing ? "Reading session…" : "Nothing waiting")
+                    Text(isManual ? "Nothing yet. Add a task below." : session.analyzing ? "Reading session…" : session.busy ? "Working, nothing waiting on you yet" : "Nothing waiting")
                         .font(.system(size: 12)).foregroundStyle(Look.dim)
                         .padding(.top, 14).frame(maxWidth: .infinity)
                 }

@@ -8,6 +8,8 @@ enum TerminalLauncher {
 
     static func resume(sessionID: String, cwd: String) {
         guard sessionID.range(of: #"^[0-9a-fA-F-]{8,64}$"#, options: .regularExpression) != nil else { return }
+        // already open in some terminal: bring that one forward instead of starting a second copy
+        if focusRunning(sessionID) { return }
         let dir = FileManager.default.fileExists(atPath: cwd) ? cwd : NSHomeDirectory()
         let command = "cd \(shellQuote(dir)) && claude --resume \(sessionID)"
         let app = terminal(for: sessionID)
@@ -36,6 +38,68 @@ enum TerminalLauncher {
         }
     }
 
+    /// Brings the window that hosts a still-running session to the front. Terminal and iTerm can select the exact
+    /// tab by its tty; other apps (Warp, Ghostty, …) have no scripting for that, so only the app is activated.
+    private static func focusRunning(_ sessionID: String) -> Bool {
+        guard let pid = pid(of: sessionID), kill(pid, 0) == 0, let host = hostApp(of: pid) else { return false }
+        let tty = ps(pid, field: "tty").map { "/dev/" + $0 } ?? ""
+        switch host {
+        case "Terminal" where !tty.isEmpty:
+            run("""
+            tell application "Terminal"
+                activate
+                repeat with w in windows
+                    repeat with t in tabs of w
+                        if tty of t is "\(tty)" then
+                            set selected of t to true
+                            set index of w to 1
+                            return
+                        end if
+                    end repeat
+                end repeat
+            end tell
+            """)
+        case "iTerm" where !tty.isEmpty:
+            run("""
+            tell application "iTerm"
+                activate
+                repeat with w in windows
+                    repeat with t in tabs of w
+                        repeat with s in sessions of t
+                            if tty of s is "\(tty)" then
+                                select t
+                                select s
+                                return
+                            end if
+                        end repeat
+                    end repeat
+                end repeat
+            end tell
+            """)
+        default:
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            p.arguments = ["-a", host]
+            try? p.run()
+        }
+        return true
+    }
+
+    /// First app bundle above the process in the tree, e.g. "Warp".
+    private static func hostApp(of pid: Int32) -> String? {
+        var current = pid
+        for _ in 0..<12 {
+            guard let line = ps(current, field: "ppid=,comm=") else { return nil }
+            let parts = line.split(separator: " ", maxSplits: 1).map(String.init)
+            guard parts.count == 2, let parent = Int32(parts[0]), parent > 1 else { return nil }
+            if let r = parts[1].range(of: ".app/"), let slash = parts[1][..<r.lowerBound].lastIndex(of: "/") {
+                return String(parts[1][parts[1].index(after: slash)..<r.lowerBound])
+            }
+            current = parent
+        }
+        return nil
+    }
+
     /// The session's own terminal if it is still running, else the last one used, else one that is open, else Terminal.
     private static func terminal(for sessionID: String) -> String {
         if let pid = pid(of: sessionID), let app = ancestorTerminal(of: pid) { return app }
@@ -59,7 +123,7 @@ enum TerminalLauncher {
     private static func ancestorTerminal(of pid: Int32) -> String? {
         var current = pid
         for _ in 0..<12 {
-            guard let line = ps(current) else { return nil }
+            guard let line = ps(current, field: "ppid=,comm=") else { return nil }
             let parts = line.split(separator: " ", maxSplits: 1).map(String.init)
             guard parts.count == 2, let parent = Int32(parts[0]), parent > 1 else { return nil }
             for name in known where parts[1].contains("/\(name).app/") { return name }
@@ -68,10 +132,10 @@ enum TerminalLauncher {
         return nil
     }
 
-    private static func ps(_ pid: Int32) -> String? {
+    private static func ps(_ pid: Int32, field: String) -> String? {
         let p = Process(), out = Pipe()
         p.executableURL = URL(fileURLWithPath: "/bin/ps")
-        p.arguments = ["-o", "ppid=,comm=", "-p", "\(pid)"]
+        p.arguments = ["-o", field.hasSuffix("=") || field.contains(",") ? field : field + "=", "-p", "\(pid)"]
         p.standardOutput = out
         p.standardError = FileHandle.nullDevice
         do { try p.run() } catch { return nil }

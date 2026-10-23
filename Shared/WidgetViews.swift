@@ -66,7 +66,7 @@ struct TodoWidgetView: View {
     @Environment(\.widgetFamily) private var environmentFamily
     private var family: WidgetFamily { familyOverride ?? environmentFamily }
 
-    private var tabs: [TodoSession] { entry.state.sessions.filter { $0.openCount > 0 || $0.analyzing } }
+    private var tabs: [TodoSession] { entry.state.sessions.filter { $0.openCount > 0 || $0.analyzing || $0.busy } }
     private var selected: TodoSession? { tabs.first { $0.id == entry.selectedID } ?? tabs.first }
 
     private var tabSlots: Int { family == .systemLarge ? 4 : 3 }
@@ -75,7 +75,10 @@ struct TodoWidgetView: View {
     private var windowStart: Int { max(0, min(selectedIndex - tabSlots + 1, tabs.count - tabSlots)) }
     private var visibleTabs: [TodoSession] { Array(tabs.dropFirst(windowStart).prefix(tabSlots)) }
 
-    private var rowLimit: Int { family == .systemLarge ? 5 : family == .systemMedium ? 2 : 3 }
+    private var rowLimit: Int {
+        let busy = selected?.busy == true && selected?.nowDoing.isEmpty == false
+        return family == .systemLarge ? 5 : family == .systemMedium ? (busy ? 1 : 2) : 3
+    }
 
     private var openItems: [TodoItem] {
         guard let s = selected else { return [] }
@@ -87,6 +90,7 @@ struct TodoWidgetView: View {
         let content = VStack(spacing: family == .systemMedium ? 5 : 8) {
             if family == .systemSmall { smallLabel } else { tabStrip }
             header
+            nowLine
             rows
             Spacer(minLength: 0)
         }
@@ -100,12 +104,24 @@ struct TodoWidgetView: View {
     private var header: some View {
         let n = selected?.openCount ?? 0
         return HStack(spacing: 5) {
-            if !(n == 0 && selected?.analyzing == true) { Text(n == 0 ? "All clear" : "\(n)").font(.system(size: family == .systemMedium ? 17 : 20, weight: .bold, design: .rounded)) }
+            if !(n == 0 && (selected?.analyzing == true || selected?.busy == true)) { Text(n == 0 ? "All clear" : "\(n)").font(.system(size: family == .systemMedium ? 17 : 20, weight: .bold, design: .rounded)) }
+            if n == 0, selected?.analyzing != true, selected?.busy == true { Text("Working…").font(.system(size: 13, weight: .medium)).foregroundStyle(Look.dim) }
             if n == 0, selected?.analyzing == true { Text("Reading session…").font(.system(size: 13, weight: .medium)).foregroundStyle(Look.dim) }
             if n > 0 { Text(youCount > 0 ? "waiting · \(youCount) on you" : "waiting").font(.system(size: 13, weight: .medium)).foregroundStyle(Look.dim) }
         }
         .foregroundStyle(n == 0 ? Look.accent : Look.text)
         .frame(maxWidth: .infinity)
+    }
+
+    /// Live activity of a busy session ("Editing TodoPanel.swift").
+    @ViewBuilder private var nowLine: some View {
+        if let s = selected, s.busy, !s.nowDoing.isEmpty, family != .systemSmall {
+            HStack(spacing: 5) {
+                Image(systemName: "bolt.fill").font(.system(size: 9)).foregroundStyle(Look.amber)
+                Text(s.nowDoing).font(.system(size: 10.5, weight: .medium)).foregroundStyle(Look.amber).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity)
+        }
     }
 
     private var youCount: Int { openItems.filter(\.needsYou).count }
@@ -116,7 +132,7 @@ struct TodoWidgetView: View {
                 let isSelected = session.id == selected?.id
                 Button(intent: SelectSessionIntent(sessionID: session.id)) {
                     HStack(spacing: 4) {
-                        if session.id != "manual" { Circle().fill(isSelected ? Color.black.opacity(0.55) : session.live ? Look.accent : Look.dim).frame(width: 5, height: 5) }
+                        if session.id != "manual" { Circle().fill(isSelected ? Color.black.opacity(0.55) : session.busy ? Look.amber : session.live ? Look.accent : Look.dim).frame(width: 5, height: 5) }
                         Text(session.title).lineLimit(1)
                     }
                     .font(.system(size: 10, weight: .semibold))

@@ -19,13 +19,13 @@ struct WidgetState: Codable {
                          detail: "The retry test times out after the new signature check."),
                 TodoItem(id: "2", content: "Update the order confirmation email", activeForm: "Update the order confirmation email", status: .pending,
                          detail: "Template still shows the old shipping estimate."),
-            ], updatedAt: .now.addingTimeInterval(-5 * 60)),
+            ], updatedAt: .now.addingTimeInterval(-5 * 60), live: true, busy: true, nowDoing: "Editing webhook_test.py"),
             TodoSession(id: "demo-2", title: "API v2", cwd: "", items: [
                 TodoItem(id: "0", content: "Rotate the staging API key", activeForm: "Rotate the staging API key", status: .pending,
                          detail: "The key was pasted into the chat; create a new one.", needsYou: true),
                 TodoItem(id: "1", content: "Run the v2 schema migration", activeForm: "Run the v2 schema migration", status: .pending,
                          detail: "Dry run passed; waiting for the go-ahead."),
-            ], updatedAt: .now.addingTimeInterval(-42 * 60)),
+            ], updatedAt: .now.addingTimeInterval(-42 * 60), live: true, busy: true, nowDoing: "Running the v2 migration dry run"),
             TodoSession(id: "demo-3", title: "Docs", cwd: "", items: [
                 TodoItem(id: "0", content: "Finish the install guide", activeForm: "Finish the install guide", status: .pending,
                          detail: "Linux and Windows sections are still empty."),

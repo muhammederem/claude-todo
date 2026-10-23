@@ -54,6 +54,8 @@ struct TodoSession: Identifiable, Hashable, Codable {
     var live = true
     var busy = false
     var lastPrompt = ""
+    /// Live activity of a busy session, e.g. "Editing TodoPanel.swift".
+    var nowDoing = ""
 
     var openCount: Int { items.filter { $0.status != .completed }.count }
     var doneCount: Int { items.count - openCount }
@@ -72,6 +74,7 @@ extension TodoSession {
         live = try c.decodeIfPresent(Bool.self, forKey: .live) ?? true
         busy = try c.decodeIfPresent(Bool.self, forKey: .busy) ?? false
         lastPrompt = try c.decodeIfPresent(String.self, forKey: .lastPrompt) ?? ""
+        nowDoing = try c.decodeIfPresent(String.self, forKey: .nowDoing) ?? ""
     }
 }
 

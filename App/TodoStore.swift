@@ -176,7 +176,7 @@ final class TodoStore: ObservableObject {
 
     /// Writes state.json for the widget and nudges WidgetKit, but only when something actually changed.
     private func publishForWidget() {
-        let state = WidgetState(updatedAt: .now, sessions: sessions.filter { !$0.items.isEmpty || $0.analyzing })
+        let state = WidgetState(updatedAt: .now, sessions: sessions.filter { !$0.items.isEmpty || $0.analyzing || $0.busy })
         if let last = published, last.sessions == state.sessions { return }
         published = state
         SharedState.write(state)
@@ -191,6 +191,7 @@ final class TodoStore: ObservableObject {
         let scanner = TranscriptScanner(claudeDir: dir)
         for s in buildSessions(from: scanner.scan(), analyzer: nil) {
             print("[\(s.title)] \(s.live ? (s.busy ? "busy" : "live") : "closed")\(s.auto ? " auto" : " todo")")
+            if !s.nowDoing.isEmpty { print("  now: \(s.nowDoing)") }
             for i in s.items { print("  \(i.kind.rawValue)/\(i.status.rawValue): \(i.content)") }
         }
         exit(0)

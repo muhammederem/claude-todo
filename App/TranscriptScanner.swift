@@ -103,9 +103,11 @@ final class TranscriptScanner: @unchecked Sendable {
                 turn.lastPrompt = text
                 turn.lastAssistant = ""      // a new request starts a new turn
                 turn.stopReason = nil
+                turn.activity = ""
             } else if isAssistant {
                 turn.stopReason = message["stop_reason"] as? String
                 if let text = Self.text(of: message), !text.isEmpty { turn.lastAssistant = text }
+                if let now = Self.activity(of: message) { turn.activity = now }
             }
             if hasTodo, let items = Self.todoList(in: message) { turn.todos = items }
         }
@@ -122,6 +124,38 @@ final class TranscriptScanner: @unchecked Sendable {
         if let origin = obj["origin"] as? [String: Any], origin["kind"] as? String != "human" { return nil }
         guard let text = text(of: message), !text.isEmpty, !text.hasPrefix("<") else { return nil }
         return text
+    }
+
+    /// A short "what is it doing" line from the last tool call in an assistant message.
+    static func activity(of message: [String: Any]) -> String? {
+        guard let blocks = message["content"] as? [[String: Any]] else { return nil }
+        func name(_ path: Any?) -> String { ((path as? String) ?? "").split(separator: "/").last.map(String.init) ?? "a file" }
+        func clip(_ s: String, _ n: Int = 48) -> String {
+            let one = s.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespaces)
+            return one.count > n ? String(one.prefix(n)) + "…" : one
+        }
+        if let tool = blocks.last(where: { $0["type"] as? String == "tool_use" }),
+           let tn = tool["name"] as? String {
+            let input = tool["input"] as? [String: Any] ?? [:]
+            switch tn {
+            case "Edit", "MultiEdit", "Write", "NotebookEdit": return "Editing \(name(input["file_path"] ?? input["notebook_path"]))"
+            case "Read": return "Reading \(name(input["file_path"]))"
+            case "Grep", "Glob": return "Searching the code"
+            case "Bash":
+                if let d = input["description"] as? String, !d.isEmpty { return clip(d) }
+                return "Running " + clip((input["command"] as? String) ?? "a command", 40)
+            case "Task", "Agent": return "Sub-agent: " + clip((input["description"] as? String) ?? "working", 38)
+            case "WebFetch", "WebSearch": return "Searching the web"
+            case "TodoWrite":
+                let todos = input["todos"] as? [[String: Any]] ?? []
+                if let cur = todos.first(where: { $0["status"] as? String == "in_progress" }),
+                   let f = (cur["activeForm"] ?? cur["content"]) as? String { return clip(f) }
+                return "Planning the next steps"
+            default: return tn.hasPrefix("mcp__") ? "Using \(tn.split(separator: "_").last.map(String.init) ?? "a tool")" : "Using \(tn)"
+            }
+        }
+        if blocks.contains(where: { $0["type"] as? String == "text" }) { return "Writing a reply" }
+        return nil
     }
 
     static func text(of message: [String: Any]) -> String? {
@@ -224,11 +258,12 @@ func buildSessions(from scanned: [ScannedSession], analyzer: SessionAnalyzer?, d
         }
 
         let onlyResume = items.allSatisfy { $0.kind == .resume }
-        if items.isEmpty && !analyzing { continue }
+        if items.isEmpty && !analyzing && !s.busy { continue }
         if !s.live, onlyResume, Date().timeIntervalSince(s.mtime) > closedWindow { continue }
 
         out.append(TodoSession(id: s.id, title: title, cwd: s.cwd, items: items, updatedAt: s.mtime,
-                               auto: auto, analyzing: analyzing, live: s.live, busy: s.busy, lastPrompt: s.turn.lastPrompt))
+                               auto: auto, analyzing: analyzing, live: s.live, busy: s.busy, lastPrompt: s.turn.lastPrompt,
+                               nowDoing: s.busy ? s.turn.activity : ""))
     }
 
     // Running sessions first, then by recency; same-named tabs get a number so they stay distinguishable.
