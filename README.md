@@ -17,10 +17,12 @@ A menu bar app and desktop widget that shows what is still unfinished across you
 
 ## Install
 
-Homebrew (once a release is published):
+Homebrew:
 
 ```sh
-brew install --cask muhammederem/claude-todo/claude-todo
+brew tap muhammederem/claude-todo
+brew trust muhammederem/claude-todo   # newer Homebrew only loads casks from third-party taps you trust
+brew install claude-todo
 ```
 
 or download `ClaudeTodo.dmg` from the Releases page and drag the app to Applications. Then add the widget: right-click the desktop, **Edit Widgets**, search "Claude To-Do".
