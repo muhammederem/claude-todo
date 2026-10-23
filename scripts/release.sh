@@ -18,7 +18,7 @@ xcodegen generate >/dev/null
 rm -rf "$DD" "$OUT"; mkdir -p "$OUT"
 xcodebuild -project ClaudeTodo.xcodeproj -scheme ClaudeTodo -configuration Release -derivedDataPath "$DD" \
   CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Developer ID Application" DEVELOPMENT_TEAM="$TEAM_ID" \
-  PROVISIONING_PROFILE_SPECIFIER="" ENABLE_HARDENED_RUNTIME=YES OTHER_CODE_SIGN_FLAGS="--timestamp" build | tail -1
+  PROVISIONING_PROFILE_SPECIFIER="" ENABLE_HARDENED_RUNTIME=YES CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO OTHER_CODE_SIGN_FLAGS="--timestamp" build | tail -1
 
 ditto --noextattr --norsrc "$DD/Build/Products/Release/ClaudeTodo.app" "$OUT/ClaudeTodo.app"
 codesign --verify --deep --strict --verbose=2 "$OUT/ClaudeTodo.app"
