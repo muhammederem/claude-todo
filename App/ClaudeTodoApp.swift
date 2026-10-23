@@ -5,7 +5,6 @@ import WidgetKit
 struct ClaudeTodoApp: App {
     @NSApplicationDelegateAdaptor(URLHandler.self) private var urlHandler
     @StateObject private var store = TodoStore()
-    @StateObject private var clock = TickerClock()
 
     init() {
         let args = CommandLine.arguments
@@ -23,7 +22,7 @@ struct ClaudeTodoApp: App {
             TodoPanel(store: store)
                 .frame(width: 320, height: 420)
         } label: {
-            MenuBarTicker(store: store, clock: clock)
+            MenuBarLabel(store: store)
         }
         .menuBarExtraStyle(.window)
     }
@@ -65,7 +64,7 @@ enum Snapshot {
         let store = TodoStore(autoRefresh: false)
         if CommandLine.arguments.contains("--demo") { store.loadDemo() } else { store.refreshNow() }
         let content = VStack(spacing: 8) {
-            MenuBarTicker(store: store, clock: TickerClock())
+            MenuBarLabel(store: store)
             TodoPanel(store: store, preview: true).frame(width: 320, height: 420)
         }
         .padding(8).background(Color(white: 0.2))

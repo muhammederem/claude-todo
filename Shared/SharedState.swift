@@ -3,16 +3,14 @@ import Foundation
 /// Snapshot the app publishes for the widget (the sandboxed widget can't read ~/.claude itself).
 struct WidgetState: Codable {
     var updatedAt: Date
-    var ticker: String
     var sessions: [TodoSession]
 
     var openCount: Int { sessions.reduce(0) { $0 + $1.openCount } }
 
-    static let empty = WidgetState(updatedAt: .now, ticker: "", sessions: [])
+    static let empty = WidgetState(updatedAt: .now, sessions: [])
     /// Fictional data for the widget gallery placeholder and the README screenshots.
     static let sample = WidgetState(
         updatedAt: .now,
-        ticker: "",
         sessions: [
             TodoSession(id: "demo-1", title: "Checkout", cwd: "", items: [
                 TodoItem(id: "0", content: "Approve the pricing copy", activeForm: "Approve the pricing copy", status: .pending,

@@ -43,19 +43,6 @@ final class TodoStore: ObservableObject {
     }
 
     /// Running tasks first (prefixed with `>`), then pending ones; used by the panel, menu bar and widget.
-    var tickerText: String {
-        // one headline per session (its most important item) so the sign doesn't recite everything on a loop
-        var seen = Set<String>()
-        var parts: [String] = []
-        for session in sessions {
-            let open = session.items.filter { $0.status != .completed }
-            guard let top = open.first(where: { $0.status == .inProgress }) ?? open.first else { continue }
-            guard seen.insert(top.content.lowercased()).inserted else { continue }
-            parts.append(top.kind.marker + (top.status == .inProgress ? top.activeForm : top.content))
-        }
-        return parts.isEmpty ? "NOTHING WAITING" : parts.prefix(6).joined(separator: "  *  ")
-    }
-
     init(autoRefresh: Bool = true) {
         let dir = ProcessInfo.processInfo.environment["CLAUDE_DIR"]
             .map { URL(fileURLWithPath: $0) }
@@ -189,8 +176,8 @@ final class TodoStore: ObservableObject {
 
     /// Writes state.json for the widget and nudges WidgetKit, but only when something actually changed.
     private func publishForWidget() {
-        let state = WidgetState(updatedAt: .now, ticker: tickerText, sessions: sessions.filter { !$0.items.isEmpty || $0.analyzing })
-        if let last = published, last.sessions == state.sessions, last.ticker == state.ticker { return }
+        let state = WidgetState(updatedAt: .now, sessions: sessions.filter { !$0.items.isEmpty || $0.analyzing })
+        if let last = published, last.sessions == state.sessions { return }
         published = state
         SharedState.write(state)
         WidgetCenter.shared.reloadAllTimelines()
@@ -208,10 +195,4 @@ final class TodoStore: ObservableObject {
         }
         exit(0)
     }
-}
-
-/// Drives the menu bar ticker; separate from TodoStore so only the label re-renders on each tick.
-@MainActor
-final class TickerClock: ObservableObject {
-    // no ticking any more: the menu bar shows a static count
 }

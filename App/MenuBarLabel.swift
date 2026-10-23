@@ -1,9 +1,8 @@
 import SwiftUI
 
 /// Menu bar item: a checklist icon with the number of waiting tasks.
-struct MenuBarTicker: View {
+struct MenuBarLabel: View {
     @ObservedObject var store: TodoStore
-    @ObservedObject var clock: TickerClock
 
     var body: some View {
         HStack(spacing: 3) {

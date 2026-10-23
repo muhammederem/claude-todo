@@ -6,24 +6,13 @@ enum TodoStatus: String, Codable {
     case completed
 }
 
-/// Where an item came from; drives the little marker shown before its text.
+/// Where an item came from; drives the icon shown before its text.
 enum ItemKind: String, Codable {
     case todo          // a real TodoWrite entry, or something the user typed
     case working       // what a busy session is doing right now
     case offer         // Claude asked or offered something and is waiting for an answer
     case interrupted   // the session stopped mid-task (tool call or API error)
     case resume        // session closed: "this is where we stopped"
-
-    /// Prefix used in LED text (the dot-matrix font only has a few symbols).
-    var marker: String {
-        switch self {
-        case .todo: ""
-        case .working: ">"
-        case .offer: "?"
-        case .interrupted: "!"
-        case .resume: "<"
-        }
-    }
 }
 
 struct TodoItem: Identifiable, Hashable, Codable {
