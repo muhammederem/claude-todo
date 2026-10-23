@@ -1,0 +1,51 @@
+name: ClaudeTodo
+options:
+  bundleIdPrefix: com.muhammederem
+  deploymentTarget:
+    macOS: "15.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CODE_SIGN_STYLE: Automatic
+    # Xcode'a Apple ID ile giriş yapınca takım kimliğini buraya yaz (10 karakter).
+targets:
+  ClaudeTodo:
+    type: application
+    platform: macOS
+    sources: [App, Shared]
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleName: Claude To-Do
+        LSUIElement: true
+        CFBundleURLTypes:
+          - CFBundleURLName: com.muhammederem.claude-todo
+            CFBundleURLSchemes: [claudetodo]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.muhammederem.claude-todo
+        GENERATE_INFOPLIST_FILE: NO
+    dependencies:
+      - target: ClaudeTodoWidget
+        embed: true
+  ClaudeTodoWidget:
+    type: app-extension
+    platform: macOS
+    sources: [Widget, Shared]
+    info:
+      path: Widget/Info.plist
+      properties:
+        CFBundleName: Claude To-Do Widget
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: Widget/Widget.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        # The sandboxed widget reads state.json and stores the picked tab in this folder.
+        com.apple.security.temporary-exception.files.home-relative-path.read-write:
+          - /Library/Application Support/ClaudeTodo/
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.muhammederem.claude-todo.widget
+        GENERATE_INFOPLIST_FILE: NO
