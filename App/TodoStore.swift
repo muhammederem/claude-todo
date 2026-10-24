@@ -30,6 +30,7 @@ final class TodoStore: ObservableObject {
     private let queue = DispatchQueue(label: "claude-todo.scan", qos: .utility)
     private var timer: Timer?
     private var published: WidgetState?
+    private var lastWidgetReload = Date()
 
     /// "Benim" tab first (always present), then one tab per Claude Code session.
     var sessions: [TodoSession] {
@@ -63,6 +64,8 @@ final class TodoStore: ObservableObject {
                 guard let self else { return }
                 self.refresh()
                 Notifier.check(self.transcript)
+                // WidgetKit may drop an individual reload request; a periodic one keeps the widget from going stale
+                if Date().timeIntervalSince(self.lastWidgetReload) > 300 { self.lastWidgetReload = .now; WidgetCenter.shared.reloadAllTimelines() }
             }
         }
         if autoRefresh {
@@ -184,6 +187,7 @@ final class TodoStore: ObservableObject {
         if let last = published, last.sessions == state.sessions { return }
         published = state
         SharedState.write(state)
+        lastWidgetReload = .now
         WidgetCenter.shared.reloadAllTimelines()
     }
 

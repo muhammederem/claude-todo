@@ -11,7 +11,7 @@ struct TodoProvider: TimelineProvider {
     func getTimeline(in context: Context, completion: @escaping (Timeline<TodoEntry>) -> Void) {
         // A single entry: a tab tap reloads the timeline, and one entry renders far faster than a long list.
         // The app also calls reloadAllTimelines() whenever the data changes.
-        completion(Timeline(entries: [entry(at: .now)], policy: .after(Date().addingTimeInterval(15 * 60))))
+        completion(Timeline(entries: [entry(at: .now)], policy: .after(Date().addingTimeInterval(5 * 60))))
     }
 
     private func entry(at date: Date) -> TodoEntry {
