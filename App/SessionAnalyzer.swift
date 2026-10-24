@@ -73,6 +73,14 @@ final class SessionAnalyzer: @unchecked Sendable {
         lock.withLock { enabled && claudePath() != nil && cache[id] == nil && (failedUntil[id] ?? .distantPast) <= Date() }
     }
 
+    /// Why summaries are not appearing, for a notice in the panel; nil when all is well.
+    var problem: String? {
+        guard enabled else { return nil }
+        if claudePath() == nil { return "Claude Code not found: AI summaries are off." }
+        let failing = lock.withLock { failedUntil.values.contains { $0 > Date() } }
+        return failing ? "Summaries failed. Is Claude Code logged in? Run `claude` once in a terminal." : nil
+    }
+
     func reset() {
         lock.withLock { cache = [:]; failedUntil = [:] }
         try? FileManager.default.removeItem(at: storeURL)

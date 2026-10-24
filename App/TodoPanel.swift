@@ -13,6 +13,10 @@ struct TodoPanel: View {
         VStack(spacing: 10) {
             tabs
             if let session = store.selected { list(session) }
+            if let problem = store.summaryProblem {
+                Text(problem).font(.system(size: 10.5)).foregroundStyle(Look.amber)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             input
             footer
         }

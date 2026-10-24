@@ -27,7 +27,7 @@ brew install claude-todo
 
 or download `ClaudeTodo.dmg` from the Releases page and drag the app to Applications. Then add the widget: right-click the desktop, **Edit Widgets**, search "Claude To-Do".
 
-Requires macOS 15+ and [Claude Code](https://claude.com/claude-code).
+Requires macOS 15+ and [Claude Code](https://claude.com/claude-code), installed and **logged in** (run `claude` once in a terminal). Without it the app still lists sessions with simple rules, and the panel tells you why the AI summaries are missing.
 
 ## How it works
 

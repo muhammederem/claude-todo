@@ -19,6 +19,8 @@ final class TodoStore: ObservableObject {
     }
 
     @Published private(set) var hiddenCount = 0
+    /// Set when the AI summary cannot run (no `claude`, or not logged in).
+    @Published private(set) var summaryProblem: String?
     private var dismissed = UserDefaults.standard.dictionary(forKey: "dismissedTabs") as? [String: String] ?? [:]
     private var dismissedItems = Set(UserDefaults.standard.stringArray(forKey: "dismissedItems") ?? [])
     private var fingerprints: [String: String] = [:]
@@ -83,6 +85,8 @@ final class TodoStore: ObservableObject {
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 self.fingerprints = prints
+                let problem = smart ? self.analyzer.problem : nil
+                if problem != self.summaryProblem { self.summaryProblem = problem }
                 guard found != self.transcript else { return }
                 self.transcript = found
                 self.publishForWidget()
