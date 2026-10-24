@@ -132,14 +132,16 @@ struct TodoWidgetView: View {
                 let isSelected = session.id == selected?.id
                 Button(intent: SelectSessionIntent(sessionID: session.id)) {
                     HStack(spacing: 4) {
-                        if session.id != "manual" { Circle().fill(isSelected ? Color.black.opacity(0.55) : session.busy ? Look.amber : session.live ? Look.accent : Look.dim).frame(width: 5, height: 5) }
+                        if session.id != "manual" { Circle().fill(session.busy ? Look.amber : session.live ? Look.accent : Look.dim).frame(width: 5, height: 5) }
                         Text(session.title).lineLimit(1)
                     }
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(isSelected ? Color.black.opacity(0.85) : Look.dim)
+                    // light text on a translucent pill: stays readable when macOS tints the widget (accented mode)
+                    .foregroundStyle(isSelected ? Look.text : Look.dim)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, family == .systemMedium ? 4 : 5)
-                    .background(isSelected ? Look.accent : Look.chip, in: Capsule())
+                    .background(isSelected ? Look.accent.opacity(0.30) : Look.chip, in: Capsule())
+                    .overlay(Capsule().strokeBorder(Look.accent.opacity(isSelected ? 0.7 : 0), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
             }
