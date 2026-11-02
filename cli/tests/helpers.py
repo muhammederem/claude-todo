@@ -1,8 +1,13 @@
 import json
 import os
+import sys
+import unittest
 import tempfile
 import time
 from pathlib import Path
+
+
+posix_only = unittest.skipIf(sys.platform == "win32", "uses POSIX shell scripts, ptys or /proc")
 
 
 def line(kind, content, **extra):

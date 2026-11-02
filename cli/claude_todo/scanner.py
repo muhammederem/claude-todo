@@ -1,6 +1,7 @@
 """Reads Claude Code transcripts and the live-session registry. Port of TranscriptScanner.swift; no model calls."""
 import json
 import os
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -175,7 +176,23 @@ def parse(path: Path, mtime: float, size: int, project_dir: str) -> Optional[Sca
     return Scanned(path.stem, path, mtime, size, cwd, fallback, turn)
 
 
+def _pid_alive_windows(pid: int) -> bool:
+    """os.kill(pid, 0) must never be used on Windows: signal 0 is CTRL_C_EVENT there."""
+    import ctypes
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.OpenProcess(0x1000, False, pid)        # PROCESS_QUERY_LIMITED_INFORMATION
+    if not handle:
+        return kernel32.GetLastError() == 5                  # access denied: it exists but is not ours
+    try:
+        code = ctypes.c_ulong()
+        return bool(kernel32.GetExitCodeProcess(handle, ctypes.byref(code))) and code.value == 259    # STILL_ACTIVE
+    finally:
+        kernel32.CloseHandle(handle)
+
+
 def pid_alive(pid: int) -> bool:
+    if sys.platform == "win32":
+        return _pid_alive_windows(pid)
     try:
         os.kill(pid, 0)
     except ProcessLookupError:

@@ -5,6 +5,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from .helpers import posix_only
+
 from claude_todo import terminals as t
 
 SID = "0123abcd-4567-89ef-0123-456789abcdef"
@@ -16,6 +18,7 @@ def fake_bin(directory, name, body="exit 0\n"):
     p.chmod(p.stat().st_mode | stat.S_IEXEC)
 
 
+@posix_only
 class Commands(unittest.TestCase):
     def test_resume_command_quotes_hostile_paths(self):
         d = tempfile.mkdtemp()
@@ -58,6 +61,7 @@ def shlex_home():
     return shlex.quote(os.path.expanduser("~"))
 
 
+@posix_only
 class Picking(unittest.TestCase):
     def setUp(self):
         self.bin = tempfile.TemporaryDirectory()

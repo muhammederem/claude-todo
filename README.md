@@ -1,6 +1,6 @@
 # Claude To-Do
 
-Shows what is still unfinished across your Claude Code sessions, one tab per session: a menu bar app and desktop widget on **macOS**, a terminal panel and status-bar module on **Linux**.
+Shows what is still unfinished across your Claude Code sessions, one tab per session: a menu bar app and desktop widget on **macOS**, a window with a tray icon on **Linux** and **Windows**.
 
 - **Zero setup.** It reads Claude Code's own session files (`~/.claude`); no hooks, no config, nothing to type in.
 - **Real to-dos, not chat snippets.** Each open item has a short title and a one-line explanation, and the ones waiting on *you* (an approval, a decision, a key) are marked and listed first.
@@ -32,16 +32,18 @@ or download `ClaudeTodo.dmg` from the Releases page and drag the app to Applicat
 
 Requires [Claude Code](https://claude.com/claude-code), installed and **logged in** (run `claude` once in a terminal). Without it the app still lists sessions with simple rules, and the panel tells you why the AI summaries are missing.
 
-### Linux (and anything with Python 3.9+)
+### Linux and Windows
+
+A window with a tray icon, like the macOS panel (tabs per session, waiting-on-you marking, live view, resume, notifications, start at login):
 
 ```sh
-pipx install "git+https://github.com/muhammederem/claude-todo#subdirectory=cli"
-claude-todo            # terminal panel
-claude-todo list       # plain text
-claude-todo waybar     # status-bar JSON (waybar, polybar, i3blocks)
+pipx install "claude-todo[gui] @ git+https://github.com/muhammederem/claude-todo#subdirectory=cli"
+claude-todo gui
 ```
 
-Same session detection, AI summaries and "waiting on you" marking; no desktop widget (Linux has none to target). Details: [cli/README.md](cli/README.md).
+Needs Python 3.9+. On Windows use `py -m pip install ...` instead of pipx if you do not have it, then run `claude-todo-gui` (no console window). There is also a terminal panel and a status-bar module (waybar, polybar) on Linux; details in [cli/README.md](cli/README.md). There is no desktop widget on Linux or Windows.
+
+<p align="center"><img src="docs/window.png" alt="Linux and Windows window" width="300"></p>
 
 ## How it works
 

@@ -2,6 +2,8 @@
 import json
 import shutil
 import subprocess
+import sys
+import tempfile
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -34,9 +36,19 @@ SYSTEM_PROMPT = (
 )
 
 
+def _no_window() -> dict:
+    """Keep a console window from flashing up on Windows each time a summary runs."""
+    return {"creationflags": 0x08000000} if sys.platform == "win32" else {}
+
+
 def find_claude() -> Optional[str]:
-    return shutil.which("claude") or next(
-        (p for p in (str(Path.home() / ".local/bin/claude"), "/usr/local/bin/claude", "/opt/homebrew/bin/claude") if Path(p).is_file()), None)
+    found = shutil.which("claude")
+    if found:
+        return found
+    home = Path.home()
+    candidates = [home / ".local/bin/claude", Path("/usr/local/bin/claude"), Path("/opt/homebrew/bin/claude"),
+                  home / ".local/bin/claude.exe", home / "AppData/Roaming/npm/claude.cmd", home / ".claude/local/claude.exe"]
+    return next((str(p) for p in candidates if p.is_file()), None)
 
 
 def parse_output(raw: str):
@@ -194,7 +206,7 @@ class Analyzer:
             # --no-session-persistence keeps these runs out of ~/.claude/projects (otherwise we would analyze ourselves)
             r = subprocess.run([exe, "-p", "--model", "haiku", "--no-session-persistence", "--output-format", "json",
                                 "--tools", "", "--disable-slash-commands", "--system-prompt", SYSTEM_PROMPT],
-                               input=text, capture_output=True, text=True, timeout=120, cwd="/tmp")
+                               input=text, capture_output=True, text=True, timeout=120, cwd=tempfile.gettempdir(), **_no_window())
         except (OSError, subprocess.TimeoutExpired):
             return None
         return r.stdout if r.returncode == 0 else None

@@ -10,7 +10,7 @@ from unittest import mock
 from claude_todo import analyzer as an
 from claude_todo import build, cli
 from claude_todo import scanner as sc
-from .helpers import Home, assistant, user
+from .helpers import Home, assistant, posix_only, user
 
 FAKE_REPLY = json.dumps({"is_error": False, "result": "```json\n" + json.dumps({
     "title": "Checkout flow",
@@ -63,6 +63,7 @@ class Pipeline(unittest.TestCase):
         self.assertIn("[claude] Sure. Want me", text)
         self.assertIn("/home/u/proj", text)
 
+    @posix_only
     def test_end_to_end_with_a_fake_claude_cli(self):
         argsfile = Path(self.bin.name) / "args.txt"
         stdinfile = Path(self.bin.name) / "stdin.txt"
@@ -86,6 +87,7 @@ class Pipeline(unittest.TestCase):
         self.assertIn("redo checkout", stdinfile.read_text())
         self.assertTrue((self.h.state / "analysis.json").exists())
 
+    @posix_only
     def test_cached_summary_is_reused_and_survives_restart(self):
         d = fake_claude(Path(self.bin.name), "cat > /dev/null\n" + "cat <<'EOF'\n" + FAKE_REPLY + "\nEOF\n")
         self.h.transcript("aaaa1111", [user("redo checkout"), assistant("ok")], age=600)
@@ -104,6 +106,7 @@ class Pipeline(unittest.TestCase):
             self.assertEqual([i.kind for i in s.items], ["resume", "offer"])      # closed session: resume item + the offer
             self.assertIn("not found", a.problem)
 
+    @posix_only
     def test_failing_cli_is_reported_and_not_retried_at_once(self):
         d = fake_claude(Path(self.bin.name), "cat > /dev/null\necho 'Not logged in' >&2\nexit 1\n")
         self.h.transcript("aaaa1111", [user("x"), assistant("Should I push it?")], age=600)
@@ -115,6 +118,7 @@ class Pipeline(unittest.TestCase):
             self.assertEqual([i.kind for i in s.items], ["resume", "offer"])  # rules take over
             self.assertFalse(a.is_pending("aaaa1111"))
 
+    @posix_only
     def test_recently_active_session_is_not_summarized_yet(self):
         d = fake_claude(Path(self.bin.name), "exit 1\n")
         self.h.transcript("aaaa1111", [user("x"), assistant("hi")])       # modified just now

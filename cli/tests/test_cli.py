@@ -12,7 +12,7 @@ from pathlib import Path
 from unittest import mock
 
 from claude_todo import cli
-from .helpers import Home, assistant, user
+from .helpers import Home, assistant, posix_only, user
 
 PKG_ROOT = str(Path(__file__).resolve().parents[1])
 
@@ -97,6 +97,7 @@ class Cli(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("task number", err)
 
+    @posix_only
     def test_resume_closed_session_opens_a_terminal(self):
         bindir = tempfile.mkdtemp()
         rec = Path(bindir) / "argv.txt"
@@ -122,6 +123,7 @@ class Cli(unittest.TestCase):
         f.assert_called_once()
         r.assert_not_called()
 
+    @posix_only
     def test_resume_without_any_terminal_is_a_clean_error(self):
         with mock.patch.dict(os.environ, {"PATH": "/nonexistent"}):
             code, _, err = run("--no-ai", "resume", "proj")
@@ -141,7 +143,8 @@ class Cli(unittest.TestCase):
         self.assertEqual(run("--no-ai", "list")[1].strip(), "Nothing waiting.")
 
 
-@unittest.skipUnless(hasattr(os, "fork") and sys.platform != "win32", "needs a pty")
+@posix_only
+@unittest.skipUnless(hasattr(os, "fork"), "needs a pty")
 class Tui(unittest.TestCase):
     """Runs the real curses panel in a pseudo-terminal."""
 

@@ -11,6 +11,12 @@ requires-python = ">=3.9"
 license = { text = "MIT" }
 dependencies = []
 
+[project.optional-dependencies]
+gui = ["PySide6-Essentials>=6.5"]
+
+[project.gui-scripts]
+claude-todo-gui = "claude_todo.gui_entry:main_gui"
+
 [project.scripts]
 claude-todo = "claude_todo.cli:main"
 

@@ -1,17 +1,23 @@
-# claude-todo (Linux and anything with Python)
+# claude-todo (Linux and Windows)
 
-The same idea as the macOS app, as a dependency-free Python program: it reads Claude Code's own session files and shows what is still open in each session.
+The same idea as the macOS app: it reads Claude Code's own session files and shows what is still open in each session. The core is plain Python; only the window needs PySide6.
 
 ```sh
-pipx install "git+https://github.com/muhammederem/claude-todo#subdirectory=cli"
-# or run from a checkout: cd cli && python3 -m claude_todo
-claude-todo            # interactive panel
+pipx install "claude-todo[gui] @ git+https://github.com/muhammederem/claude-todo#subdirectory=cli"
+claude-todo gui        # window + tray icon (Linux, Windows)
+claude-todo            # terminal panel (Linux, macOS)
 claude-todo list       # plain text
 claude-todo json       # for scripts
 claude-todo waybar     # one JSON line for a status bar
 ```
 
+Without pipx: `python3 -m pip install --user "claude-todo[gui] @ git+https://github.com/muhammederem/claude-todo#subdirectory=cli"`, or from a checkout `cd cli && python3 -m claude_todo gui`. On Windows use `py -m pip install ...` and start `claude-todo-gui` (no console window). Without the `[gui]` extra there are no dependencies at all and everything except the window works.
+
 Needs Python 3.9+ and [Claude Code](https://claude.com/claude-code), installed and **logged in**.
+
+## The window
+
+One tab per session (green dot = running, amber = busy), "N waiting · M on you", the live line of a busy session, ✓ to mark a task done, Resume to reopen the session, Hide, a box for your own tasks, and a tray icon that shows the number waiting. It notifies once when something has waited on you for 15 minutes. Closing the window keeps it in the tray; **Login: on** starts it with the computer (an autostart entry on Linux, the Run key on Windows). The tray needs a system-tray host: KDE, XFCE and Cinnamon have one, GNOME needs the AppIndicator extension; without one the window just stays a normal window.
 
 ## Panel keys
 
@@ -59,11 +65,11 @@ The summaries send the tail of a conversation to the model through your own `cla
 
 ## Reopening sessions
 
-`enter` / `resume` opens a new window in the terminal the session was started from, otherwise `$CLAUDE_TODO_TERMINAL` or `$TERMINAL`, `x-terminal-emulator`, then the first of kitty, alacritty, wezterm, foot, ghostty, gnome-terminal, konsole, xfce4-terminal, tilix, terminator, xterm. If the session is still running, no second copy is opened; on X11 with `xdotool` its window is raised, elsewhere you are told where it is (Wayland offers no way to raise another app's window).
+On Windows a session reopens in Windows Terminal (`wt`) or a new `cmd` window. On Linux `enter` / `resume` opens a new window in the terminal the session was started from, otherwise `$CLAUDE_TODO_TERMINAL` or `$TERMINAL`, `x-terminal-emulator`, then the first of kitty, alacritty, wezterm, foot, ghostty, gnome-terminal, konsole, xfce4-terminal, tilix, terminator, xterm. If the session is still running, no second copy is opened; on X11 with `xdotool` its window is raised, elsewhere you are told where it is (Wayland offers no way to raise another app's window).
 
 ## Not included
 
-No desktop widget and no tray icon (Linux has no common widget API). Windows is not supported yet.
+No desktop widget on Linux or Windows (no common widget API). The terminal panel needs `curses`, which Windows lacks; use the window there.
 
 ## Tests
 

@@ -92,10 +92,11 @@ def open_session(s: Session) -> str:
 def main(argv: Optional[List[str]] = None) -> int:
     p = argparse.ArgumentParser(prog="claude-todo", description="What is still open across your Claude Code sessions.")
     p.add_argument("command", nargs="?", default="ui",
-                   choices=["ui", "list", "json", "waybar", "add", "done", "hide", "restore", "resume", "reset"],
-                   help="ui (default) | list | json | waybar | add TEXT | done SESSION N | hide SESSION | restore | resume SESSION | reset")
+                   choices=["ui", "gui", "list", "json", "waybar", "add", "done", "hide", "restore", "resume", "reset"],
+                   help="ui (default, terminal) | gui (window + tray) | list | json | waybar | add TEXT | done SESSION N | hide SESSION | restore | resume SESSION | reset")
     p.add_argument("args", nargs="*")
     p.add_argument("--no-ai", action="store_true", help="skip the `claude -p` summaries; use simple rules only")
+    p.add_argument("--tray", action="store_true", help="gui: start hidden in the tray")
     p.add_argument("--wait", action="store_true", help="wait for the summaries before printing (list/json/waybar)")
     p.add_argument("--version", action="version", version=__version__)
     a = p.parse_args(argv)
@@ -153,8 +154,19 @@ def main(argv: Optional[List[str]] = None) -> int:
                 hidden.items.add(item_key(s.id, s.items[idx].content))
                 hidden.save()
             print("Done.")
+    elif a.command == "gui":
+        try:
+            from .gui import run as run_gui
+        except ImportError:
+            print("The window needs PySide6: pip install \"claude-todo[gui]\"", file=sys.stderr)
+            return 1
+        return run_gui(scanner, analyzer, hidden, manual, start_hidden=a.tray)
     else:
-        from .tui import run
+        try:
+            from .tui import run
+        except ImportError:        # no curses on Windows
+            print("The terminal panel needs curses, which Windows lacks. Use `claude-todo gui`, or `claude-todo list`.", file=sys.stderr)
+            return 1
         return run(scanner, analyzer, hidden, manual)
     return 0
 

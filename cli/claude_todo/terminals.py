@@ -54,6 +54,24 @@ def host_terminal(pid: int) -> Optional[str]:
     return None
 
 
+def _is_windows() -> bool:
+    return sys.platform == "win32"
+
+
+_CMD_UNSAFE = set('&|<>^%"\n\r')
+
+
+def _windows_resume_argv(session_id: str, cwd: str) -> List[str]:
+    """Windows Terminal if present, otherwise a new cmd window. The id is validated hex, and a folder that cmd could
+    misread (& | < > ^ % ") is replaced by the home folder, since cmd re-parses its command line."""
+    if not re.fullmatch(r"[0-9a-fA-F-]{8,64}", session_id):
+        raise ValueError("bad session id")
+    folder = cwd if cwd and os.path.isdir(cwd) and not (set(cwd) & _CMD_UNSAFE) else os.path.expanduser("~")
+    if shutil.which("wt"):
+        return ["wt", "-d", folder, "--", "claude", "--resume", session_id]
+    return ["cmd", "/c", "start", "", "/D", folder, "cmd", "/k", "claude", "--resume", session_id]
+
+
 def resume_command(session_id: str, cwd: str) -> List[str]:
     if not re.fullmatch(r"[0-9a-fA-F-]{8,64}", session_id):
         raise ValueError("bad session id")
@@ -86,6 +104,11 @@ def terminal_argv(terminal: str, inner: List[str]) -> List[str]:
 
 def resume(session_id: str, cwd: str, pid: Optional[int] = None, dry_run: bool = False) -> List[str]:
     """Opens `claude --resume` in a new terminal window; returns the command it ran."""
+    if _is_windows():
+        argv = _windows_resume_argv(session_id, cwd)
+        if not dry_run:
+            subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL)
+        return argv
     inner = resume_command(session_id, cwd)
     terminal = pick_terminal(pid)
     if terminal is None:
@@ -97,6 +120,8 @@ def resume(session_id: str, cwd: str, pid: Optional[int] = None, dry_run: bool =
 
 
 def focus(pid: int) -> str:
+    if _is_windows():
+        return f"Already running (pid {pid}); switch to that window."
     """Best effort for a session that is already running: raise its terminal window (X11 only), else say where it is."""
     host = host_terminal(pid) or "its terminal"
     tool = shutil.which("xdotool")
