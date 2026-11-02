@@ -1,10 +1,11 @@
 # Claude To-Do
 
-A menu bar app and desktop widget that shows what is still unfinished across your Claude Code sessions, one tab per session.
+Shows what is still unfinished across your Claude Code sessions, one tab per session: a menu bar app and desktop widget on **macOS**, a terminal panel and status-bar module on **Linux**.
 
 - **Zero setup.** It reads Claude Code's own session files (`~/.claude`); no hooks, no config, nothing to type in.
 - **Real to-dos, not chat snippets.** Each open item has a short title and a one-line explanation, and the ones waiting on *you* (an approval, a decision, a key) are marked and listed first.
 - **Menu bar panel and a small/medium/large desktop widget**, with a tab per session. Tap a task to reopen that session with `claude --resume` in the terminal you use (Terminal, iTerm, Warp, Ghostty, …).
+- **Live view.** A session that is busy shows what it is doing right now ("Editing panel.py"). Opening a task of a session that is already running brings its terminal forward instead of starting a second copy.
 - Mark a task done, hide a tab, and add your own tasks in the "Mine" tab.
 - Optional notification when something has been waiting on you for 15 minutes.
 
@@ -17,6 +18,8 @@ A menu bar app and desktop widget that shows what is still unfinished across you
 
 ## Install
 
+### macOS 15+
+
 Homebrew:
 
 ```sh
@@ -27,11 +30,18 @@ brew install claude-todo
 
 or download `ClaudeTodo.dmg` from the Releases page and drag the app to Applications. Then add the widget: right-click the desktop, **Edit Widgets**, search "Claude To-Do".
 
-Requires macOS 15+ and [Claude Code](https://claude.com/claude-code), installed and **logged in** (run `claude` once in a terminal). Without it the app still lists sessions with simple rules, and the panel tells you why the AI summaries are missing.
+Requires [Claude Code](https://claude.com/claude-code), installed and **logged in** (run `claude` once in a terminal). Without it the app still lists sessions with simple rules, and the panel tells you why the AI summaries are missing.
 
-## Linux
+### Linux (and anything with Python 3.9+)
 
-There is a dependency-free Python version in [`cli/`](cli): a terminal panel, `list`/`json` output and a status-bar module (waybar, polybar), with the same session detection, AI summaries and "waiting on you" marking. See [cli/README.md](cli/README.md). It has no desktop widget (Linux has none to target).
+```sh
+pipx install "git+https://github.com/muhammederem/claude-todo#subdirectory=cli"
+claude-todo            # terminal panel
+claude-todo list       # plain text
+claude-todo waybar     # status-bar JSON (waybar, polybar, i3blocks)
+```
+
+Same session detection, AI summaries and "waiting on you" marking; no desktop widget (Linux has none to target). Details: [cli/README.md](cli/README.md).
 
 ## How it works
 
