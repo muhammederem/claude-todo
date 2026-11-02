@@ -11,6 +11,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, ubuntu-22.04, macos-latest]
         python: ["3.9", "3.12", "3.13"]
+        exclude:      # setup-python has no 3.9 build for these images; 3.9 is covered on ubuntu-22.04
+          - { os: ubuntu-latest, python: "3.9" }
+          - { os: macos-latest, python: "3.9" }
     runs-on: ${{ matrix.os }}
     defaults:
       run:
