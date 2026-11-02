@@ -77,7 +77,7 @@ enum OpenWork {
         let paragraphs = text.components(separatedBy: "\n\n").filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         let tail = paragraphs.suffix(2).joined(separator: " ").replacingOccurrences(of: "\n", with: " ")
         let trigger = try! NSRegularExpression(
-            pattern: #"\b(istersen|ister misin|onaylarsan|onay(ını|ini)? bekl|devam edeyim|hazırlarım|hazirlarim|seçersen|karar ver|would you like|want me to|shall i|should i|do you want|let me know|if you want|if you'd like|waiting (on|for) you)\b"#,
+            pattern: #"\b([iİ]stersen|[iİ]ster misin|onaylarsan|onay(ını|ini)? bekl|devam edeyim|hazırlarım|hazirlarim|seçersen|karar ver|would you like|want me to|shall i|should i|do you want|let me know|if you want|if you'd like|waiting (on|for) you)\b"#,
             options: [.caseInsensitive])
         var out: [String] = []
         for sentence in sentences(tail) {

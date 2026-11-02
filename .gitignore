@@ -4,3 +4,7 @@ App/Info.plist
 Widget/Info.plist
 .DS_Store
 xcuserdata/
+__pycache__/
+*.pyc
+cli/build/
+cli/*.egg-info/

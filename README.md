@@ -29,6 +29,10 @@ or download `ClaudeTodo.dmg` from the Releases page and drag the app to Applicat
 
 Requires macOS 15+ and [Claude Code](https://claude.com/claude-code), installed and **logged in** (run `claude` once in a terminal). Without it the app still lists sessions with simple rules, and the panel tells you why the AI summaries are missing.
 
+## Linux
+
+There is a dependency-free Python version in [`cli/`](cli): a terminal panel, `list`/`json` output and a status-bar module (waybar, polybar), with the same session detection, AI summaries and "waiting on you" marking. See [cli/README.md](cli/README.md). It has no desktop widget (Linux has none to target).
+
 ## How it works
 
 1. A scanner reads the recent session transcripts in `~/.claude/projects` and the live-session registry in `~/.claude/sessions`.

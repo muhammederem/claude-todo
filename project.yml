@@ -17,8 +17,8 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleName: Claude To-Do
-        CFBundleShortVersionString: "1.1.0"
-        CFBundleVersion: "2"
+        CFBundleShortVersionString: "1.1.1"
+        CFBundleVersion: "3"
         LSUIElement: true
         CFBundleURLTypes:
           - CFBundleURLName: com.muhammederem.claude-todo
@@ -38,8 +38,8 @@ targets:
       path: Widget/Info.plist
       properties:
         CFBundleName: Claude To-Do Widget
-        CFBundleShortVersionString: "1.1.0"
-        CFBundleVersion: "2"
+        CFBundleShortVersionString: "1.1.1"
+        CFBundleVersion: "3"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     entitlements:

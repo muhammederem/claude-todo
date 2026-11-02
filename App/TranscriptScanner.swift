@@ -248,7 +248,6 @@ func buildSessions(from scanned: [ScannedSession], analyzer: SessionAnalyzer?, d
                                  status: item.state == "in_progress" ? .inProgress : .pending, detail: item.detail,
                                  needsYou: item.needsYou)
                     }
-                    .filter { !dismissedItems.contains(itemKey(s.id, $0.content)) }
                     .partitioned()   // your items first
                 } else if analyzer.isPending(s.id) {
                     items = []   // raw sentences from the chat read badly; wait for the real summary
@@ -257,6 +256,7 @@ func buildSessions(from scanned: [ScannedSession], analyzer: SessionAnalyzer?, d
             }
         }
 
+        items = items.filter { !dismissedItems.contains(itemKey(s.id, $0.content)) }   // ✓ works with or without AI summaries
         let onlyResume = items.allSatisfy { $0.kind == .resume }
         if items.isEmpty && !analyzing && !s.busy { continue }
         if !s.live, onlyResume, Date().timeIntervalSince(s.mtime) > closedWindow { continue }
