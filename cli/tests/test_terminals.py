@@ -143,7 +143,8 @@ class ProcessTree(unittest.TestCase):
 
     def test_focus_without_xdotool_says_where_it_is(self):
         tree = {500: (300, "claude"), 300: (1, "kitty")}
-        with mock.patch.object(t, "_proc_stat", side_effect=lambda p: tree.get(p)), mock.patch.object(t.shutil, "which", return_value=None):
+        with mock.patch.object(t, "_proc_stat", side_effect=lambda p: tree.get(p)), mock.patch.object(t.shutil, "which", return_value=None), \
+                mock.patch.object(t, "_is_windows", return_value=False):
             msg = t.focus(500)
         self.assertIn("kitty", msg)
         self.assertIn("500", msg)
