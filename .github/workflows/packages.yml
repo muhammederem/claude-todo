@@ -33,7 +33,9 @@ jobs:
           ! dpkg -s libxcb-cursor0 2>/dev/null | grep -q "Status: install ok installed"
       - name: Install the .deb (apt must pull the dependencies)
         run: sudo apt-get update && sudo apt-get install -y ./claude-todo_*.deb xvfb desktop-file-utils
-      - run: dpkg -s libxcb-cursor0 | grep "Status: install ok installed"
+      - name: apt installed the missing library
+        run: |
+          dpkg -s libxcb-cursor0 | grep "Status: install ok installed"
       - run: claude-todo --version
       - run: claude-todo list --no-ai
       - name: Open the real window on X11 (xcb plugin) and check it drew
