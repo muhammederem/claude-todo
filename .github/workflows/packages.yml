@@ -8,7 +8,8 @@ jobs:
     runs-on: ubuntu-22.04        # oldest supported base, so the bundled wheels run on newer releases too
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y python3-pip
+      # Qt libraries are needed here only to render the icon while building
+      - run: sudo apt-get update && sudo apt-get install -y python3-pip libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
       - run: packaging/linux/build_deb.sh
       - run: ls -la build/deb/*.deb && dpkg-deb --info build/deb/*.deb
       - uses: actions/upload-artifact@v4
