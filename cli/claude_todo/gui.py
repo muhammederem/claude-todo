@@ -55,6 +55,25 @@ def tray_icon(count: int, you: bool = False) -> QIcon:
     return QIcon(pm)
 
 
+def app_icon() -> QIcon:
+    """Green rounded square with a check mark: window, launcher and package icon."""
+    pm = QPixmap(256, 256)
+    pm.fill(Qt.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.Antialiasing)
+    p.setBrush(QColor(GREEN))
+    p.setPen(Qt.NoPen)
+    p.drawRoundedRect(16, 16, 224, 224, 56, 56)
+    p.setPen(QColor("#101214"))
+    f = QFont()
+    f.setBold(True)
+    f.setPixelSize(150)
+    p.setFont(f)
+    p.drawText(pm.rect(), Qt.AlignCenter, "✓")
+    p.end()
+    return QIcon(pm)
+
+
 class Panel(QWidget):
     def __init__(self, scanner: Scanner, analyzer: Optional[Analyzer], hidden: Hidden, manual: Manual):
         super().__init__()
@@ -334,13 +353,23 @@ def make_tray(app: QApplication, panel: Panel) -> Optional[QSystemTrayIcon]:
     return tray
 
 
-def run(scanner: Scanner, analyzer: Optional[Analyzer], hidden: Hidden, manual: Manual, start_hidden: bool = False) -> int:
+def run(scanner: Scanner, analyzer: Optional[Analyzer], hidden: Hidden, manual: Manual, start_hidden: bool = False,
+        smoke: Optional[str] = None) -> int:
     app = QApplication.instance() or QApplication(sys.argv[:1])
     app.setQuitOnLastWindowClosed(False)
     app.setApplicationName("Claude To-Do")
+    app.setDesktopFileName("claude-todo")      # matches the .desktop file, so Wayland shows the right icon
     panel = Panel(scanner, analyzer, hidden, manual)
     tray = make_tray(app, panel)
-    app.setWindowIcon(tray_icon(0))
+    app.setWindowIcon(app_icon())
     if not (start_hidden and tray):
         panel.show()
+    if smoke:
+        # used by the package tests: prove the real platform plugin can draw the window, then leave
+        def report():
+            with open(smoke, "w") as f:
+                f.write(f"ok platform={app.platformName()} tabs={panel.tabs.count()} tray={tray is not None} "
+                        f"size={panel.width()}x{panel.height()}\n")
+            app.quit()
+        QTimer.singleShot(1500, report)
     return app.exec()

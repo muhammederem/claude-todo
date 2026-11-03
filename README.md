@@ -32,16 +32,37 @@ or download `ClaudeTodo.dmg` from the Releases page and drag the app to Applicat
 
 Requires [Claude Code](https://claude.com/claude-code), installed and **logged in** (run `claude` once in a terminal). Without it the app still lists sessions with simple rules, and the panel tells you why the AI summaries are missing.
 
-### Linux and Windows
+### Linux
 
-A window with a tray icon, like the macOS panel (tabs per session, waiting-on-you marking, live view, resume, notifications, start at login):
+A window with a tray icon, like the macOS panel (tabs per session, waiting-on-you marking, live view, resume, notifications, start at login).
+
+**Ubuntu / Debian (amd64):** download `claude-todo_<version>_amd64.deb` from the [Releases page](https://github.com/muhammederem/claude-todo/releases) and install it; apt pulls in every system library Qt needs:
+
+```sh
+sudo apt install ./claude-todo_*_amd64.deb
+```
+
+Then start **Claude To-Do** from the app menu, or run `claude-todo gui`.
+
+**Other distributions, or from source** (needs Python 3.9+):
 
 ```sh
 pipx install "claude-todo[gui] @ git+https://github.com/muhammederem/claude-todo#subdirectory=cli"
 claude-todo gui
 ```
 
-Needs Python 3.9+. On Windows use `py -m pip install ...` instead of pipx if you do not have it, then run `claude-todo-gui` (no console window). There is also a terminal panel and a status-bar module (waybar, polybar) on Linux; details in [cli/README.md](cli/README.md). There is no desktop widget on Linux or Windows.
+With pip you install Qt's system libraries yourself; if one is missing, `claude-todo gui` tells you the exact command instead of crashing (on Ubuntu usually `sudo apt install libxcb-cursor0`).
+
+### Windows
+
+```sh
+py -m pip install "claude-todo[gui] @ git+https://github.com/muhammederem/claude-todo#subdirectory=cli"
+claude-todo-gui
+```
+
+A packaged installer is planned.
+
+There is also a terminal panel and a status-bar module (waybar, polybar) on Linux; see [cli/README.md](cli/README.md). There is no desktop widget on Linux or Windows.
 
 <p align="center"><img src="docs/window.png" alt="Linux and Windows window" width="300"></p>
 

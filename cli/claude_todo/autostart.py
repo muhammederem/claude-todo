@@ -7,6 +7,12 @@ NAME = "claude-todo"
 
 
 def _command() -> list:
+    # packaged builds: the .deb wrapper and AppImage say how to start them; a frozen .exe starts itself
+    launcher = os.environ.get("CLAUDE_TODO_LAUNCHER") or os.environ.get("APPIMAGE")
+    if launcher:
+        return [launcher, "gui", "--tray"]
+    if getattr(sys, "frozen", False):
+        return [sys.executable, "gui", "--tray"]
     exe = sys.executable
     if sys.platform == "win32" and exe.lower().endswith("python.exe"):
         exe = exe[:-len("python.exe")] + "pythonw.exe"       # no console window

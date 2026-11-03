@@ -1,0 +1,48 @@
+name: packages
+on:
+  push:
+    paths: ["cli/**", "packaging/**", ".github/workflows/packages.yml"]
+  workflow_dispatch:
+jobs:
+  deb:
+    runs-on: ubuntu-22.04        # oldest supported base, so the bundled wheels run on newer releases too
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y python3-pip
+      - run: packaging/linux/build_deb.sh
+      - run: ls -la build/deb/*.deb && dpkg-deb --info build/deb/*.deb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb
+          path: build/deb/*.deb
+
+  deb-test:
+    needs: deb
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: deb
+      - name: Start without the library that broke the pip install
+        run: |
+          sudo apt-get remove -y libxcb-cursor0 || true
+          ! dpkg -s libxcb-cursor0 2>/dev/null | grep -q "Status: install ok installed"
+      - name: Install the .deb (apt must pull the dependencies)
+        run: sudo apt-get update && sudo apt-get install -y ./claude-todo_*.deb xvfb desktop-file-utils
+      - run: dpkg -s libxcb-cursor0 | grep "Status: install ok installed"
+      - run: claude-todo --version
+      - run: claude-todo list --no-ai
+      - name: Open the real window on X11 (xcb plugin) and check it drew
+        run: |
+          unset QT_QPA_PLATFORM
+          xvfb-run -a claude-todo gui --no-ai --smoke "$RUNNER_TEMP/smoke.txt"
+          cat "$RUNNER_TEMP/smoke.txt"
+          grep -q "^ok platform=xcb" "$RUNNER_TEMP/smoke.txt"
+      - run: desktop-file-validate /usr/share/applications/claude-todo.desktop
+      - run: test -s /usr/share/icons/hicolor/256x256/apps/claude-todo.png
+      - name: Remove cleanly
+        run: sudo apt-get remove -y claude-todo && ! test -e /usr/bin/claude-todo

@@ -181,6 +181,21 @@ class PanelTests(unittest.TestCase):
         self.assertIn("All clear", p.head.text())
 
 
+@unittest.skipUnless(HAVE_QT, "PySide6 not installed")
+class Smoke(unittest.TestCase):
+    def test_smoke_flag_builds_the_window_and_exits(self):
+        import subprocess, tempfile
+        h = Home()
+        self.addCleanup(h.close)
+        h.transcript(SID1, [user("x"), assistant("Would you like me to ship it?")], age=600)
+        out = Path(tempfile.mkdtemp()) / "smoke.txt"
+        env = {**os.environ, "QT_QPA_PLATFORM": "offscreen", "PYTHONPATH": str(Path(__file__).resolve().parents[1])}
+        r = subprocess.run([sys.executable, "-m", "claude_todo", "gui", "--no-ai", "--smoke", str(out)],
+                           env=env, capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(out.read_text().startswith("ok platform=offscreen tabs=2"), out.read_text())
+
+
 class Autostart(unittest.TestCase):
     @unittest.skipIf(sys.platform == "win32", "uses the XDG file")
     def test_desktop_entry_roundtrip(self):

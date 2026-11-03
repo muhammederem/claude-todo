@@ -97,6 +97,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     p.add_argument("args", nargs="*")
     p.add_argument("--no-ai", action="store_true", help="skip the `claude -p` summaries; use simple rules only")
     p.add_argument("--tray", action="store_true", help="gui: start hidden in the tray")
+    p.add_argument("--smoke", metavar="FILE", help=argparse.SUPPRESS)    # packaging tests: build the window, write FILE, exit
     p.add_argument("--wait", action="store_true", help="wait for the summaries before printing (list/json/waybar)")
     p.add_argument("--version", action="version", version=__version__)
     a = p.parse_args(argv)
@@ -155,12 +156,17 @@ def main(argv: Optional[List[str]] = None) -> int:
                 hidden.save()
             print("Done.")
     elif a.command == "gui":
+        from .preflight import advice, missing_packages
+        missing = missing_packages()
+        if missing:
+            print(advice(missing), file=sys.stderr)
+            return 1
         try:
             from .gui import run as run_gui
         except ImportError:
             print("The window needs PySide6: pip install \"claude-todo[gui]\"", file=sys.stderr)
             return 1
-        return run_gui(scanner, analyzer, hidden, manual, start_hidden=a.tray)
+        return run_gui(scanner, analyzer, hidden, manual, start_hidden=a.tray, smoke=a.smoke)
     else:
         try:
             from .tui import run

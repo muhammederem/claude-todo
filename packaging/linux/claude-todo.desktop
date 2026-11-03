@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Claude To-Do
+Comment=What is still open across your Claude Code sessions
+Exec=claude-todo gui
+Icon=claude-todo
+Terminal=false
+Categories=Development;Utility;
+Keywords=claude;todo;tasks;sessions;
+StartupWMClass=claude-todo

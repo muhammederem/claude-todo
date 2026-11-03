@@ -11,7 +11,11 @@ claude-todo json       # for scripts
 claude-todo waybar     # one JSON line for a status bar
 ```
 
+On Ubuntu/Debian the easiest way is the `.deb` from the [Releases page](https://github.com/muhammederem/claude-todo/releases) (`sudo apt install ./claude-todo_*_amd64.deb`): it bundles PySide6 and makes apt install the system libraries Qt needs, adds an app-menu entry, and `claude-todo` to your PATH.
+
 Without pipx: `python3 -m pip install --user "claude-todo[gui] @ git+https://github.com/muhammederem/claude-todo#subdirectory=cli"`, or from a checkout `cd cli && python3 -m claude_todo gui`. On Windows use `py -m pip install ...` and start `claude-todo-gui` (no console window). Without the `[gui]` extra there are no dependencies at all and everything except the window works.
+
+With pip, Qt's X11 plugin needs a few system libraries that are not always installed. `claude-todo gui` checks for them first and prints the command to run instead of letting Qt crash; on Ubuntu it is usually `sudo apt install libxcb-cursor0`. In a Wayland session Qt uses its Wayland plugin and the check is skipped.
 
 Needs Python 3.9+ and [Claude Code](https://claude.com/claude-code), installed and **logged in**.
 
