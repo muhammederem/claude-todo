@@ -6,6 +6,87 @@ struct TodoEntry: TimelineEntry {
     let date: Date
     let state: WidgetState
     let selectedID: String?
+    var cardKey: String? = nil
+    /// Cards already approved from the iPhone widget.
+    var sent: Set<String> = []
+}
+
+#if os(iOS)
+/// "Approve" on the iPhone widget: hands the suggested reply to the Mac through iCloud.
+struct ApproveReplyIntent: AppIntent {
+    static var title: LocalizedStringResource = "Approve suggested reply"
+
+    @Parameter(title: "Session") var sessionID: String
+    @Parameter(title: "Item") var itemID: String
+
+    init() {}
+    init(sessionID: String, itemID: String) {
+        self.sessionID = sessionID
+        self.itemID = itemID
+    }
+
+    func perform() async throws -> some IntentResult {
+        guard let session = SharedState.read()?.sessions.first(where: { $0.id == sessionID }),
+              let item = session.items.first(where: { $0.id == itemID }), !item.suggestion.isEmpty else { return .result() }
+        try await Cloud.sendReply(sessionID: sessionID, itemTitle: item.content, text: item.suggestion)
+        SharedState.markSent(sessionID + "|" + itemID)
+        return .result()
+    }
+}
+#endif
+
+/// The reply card: open items that come with an AI-suggested reply, across all tabs, yours first in each tab.
+struct ReplyCard {
+    let session: TodoSession
+    let item: TodoItem
+    var key: String { session.id + "|" + item.id }
+
+    /// Tabs the widget shows, in order.
+    static func tabs(_ state: WidgetState) -> [TodoSession] {
+        state.sessions.filter { $0.openCount > 0 || $0.analyzing || $0.busy }
+    }
+
+    static func queue(_ tabs: [TodoSession]) -> [ReplyCard] {
+        tabs.filter { $0.id != "manual" }.flatMap { s in
+            let open = s.items.filter { $0.status != .completed && !$0.suggestion.isEmpty }
+            return (open.filter(\.needsYou) + open.filter { !$0.needsYou }).map { ReplyCard(session: s, item: $0) }
+        }
+    }
+
+    /// Index of the card to show: the stored one if it belongs to the selected tab, else that tab's first.
+    static func current(_ queue: [ReplyCard], selected: String?, stored: String?) -> Int? {
+        guard let selected else { return nil }
+        if let stored, let i = queue.firstIndex(where: { $0.key == stored }), queue[i].session.id == selected { return i }
+        return queue.firstIndex { $0.session.id == selected }
+    }
+}
+
+/// The widget's ‹ › arrows: move to the previous/next suggested reply, switching tabs when it lives in another one.
+struct StepCardIntent: AppIntent {
+    static var title: LocalizedStringResource = "Next suggestion"
+
+    @Parameter(title: "Step") var delta: Int
+
+    init() {}
+    init(delta: Int) { self.delta = delta }
+
+    func perform() async throws -> some IntentResult {
+        guard let state = SharedState.read() else { return .result() }
+        let tabs = ReplyCard.tabs(state)
+        let queue = ReplyCard.queue(tabs)
+        guard !queue.isEmpty else { return .result() }
+        let selected = (tabs.first { $0.id == SharedState.readSelection() } ?? tabs.first)?.id
+        let next: Int
+        if let cur = ReplyCard.current(queue, selected: selected, stored: SharedState.readCard()) {
+            next = (cur + delta + queue.count) % queue.count
+        } else {
+            // the selected tab has no card: jump to the nearest one in that direction
+            next = delta > 0 ? 0 : queue.count - 1
+        }
+        SharedState.writeCard(queue[next].key)
+        SharedState.writeSelection(queue[next].session.id)
+        return .result()
+    }
 }
 
 /// Tapping a tab on the widget stores which session to show; WidgetKit reloads the timeline afterwards.
@@ -54,7 +135,21 @@ enum Look {
         return Date().timeIntervalSince(date) < 90 ? "just now" : f.localizedString(for: date, relativeTo: Date())
     }
 
-    static func resumeURL(_ id: String) -> URL? { URL(string: "claudetodo://resume?id=\(id)") }
+    static func resumeURL(_ id: String) -> URL? {
+        #if os(iOS)
+        URL(string: "claudetodo://session?id=\(id)")   // the phone can't resume; it opens that tab in the app
+        #else
+        URL(string: "claudetodo://resume?id=\(id)")
+        #endif
+    }
+    static func replyURL(_ card: ReplyCard, edit: Bool) -> URL? {
+        var c = URLComponents()
+        c.scheme = "claudetodo"
+        c.host = "reply"
+        c.queryItems = [URLQueryItem(name: "id", value: card.session.id), URLQueryItem(name: "item", value: card.item.id)]
+            + (edit ? [URLQueryItem(name: "edit", value: "1")] : [])
+        return c.url
+    }
 }
 
 struct TodoWidgetView: View {
@@ -66,7 +161,7 @@ struct TodoWidgetView: View {
     @Environment(\.widgetFamily) private var environmentFamily
     private var family: WidgetFamily { familyOverride ?? environmentFamily }
 
-    private var tabs: [TodoSession] { entry.state.sessions.filter { $0.openCount > 0 || $0.analyzing || $0.busy } }
+    private var tabs: [TodoSession] { ReplyCard.tabs(entry.state) }
     private var selected: TodoSession? { tabs.first { $0.id == entry.selectedID } ?? tabs.first }
 
     private var tabSlots: Int { family == .systemLarge ? 4 : 3 }
@@ -77,7 +172,16 @@ struct TodoWidgetView: View {
 
     private var rowLimit: Int {
         let busy = selected?.busy == true && selected?.nowDoing.isEmpty == false
+        if card != nil { return family == .systemLarge ? 3 : 0 }
         return family == .systemLarge ? 5 : family == .systemMedium ? (busy ? 1 : 2) : 3
+    }
+
+    private var queue: [ReplyCard] { ReplyCard.queue(tabs) }
+    /// The suggested reply shown as a card with Approve / Edit (not on the small widget: no room).
+    private var card: (card: ReplyCard, index: Int)? {
+        guard family != .systemSmall,
+              let i = ReplyCard.current(queue, selected: selected?.id, stored: entry.cardKey) else { return nil }
+        return (queue[i], i)
     }
 
     private var openItems: [TodoItem] {
@@ -85,12 +189,64 @@ struct TodoWidgetView: View {
         let open = s.items.filter { $0.status != .completed }
         return open.filter(\.needsYou) + open.filter { !$0.needsYou }
     }
+    /// Rows under the card: everything except the item the card already shows.
+    private var rowItems: [TodoItem] { openItems.filter { $0.id != card?.card.item.id } }
 
     var body: some View {
+        #if os(iOS)
+        if family == .accessoryRectangular || family == .accessoryInline || family == .accessoryCircular {
+            lockScreen
+        } else {
+            board
+        }
+        #else
+        board
+        #endif
+    }
+
+    #if os(iOS)
+    /// Lock Screen: what waits on you first, else the total.
+    @ViewBuilder private var lockScreen: some View {
+        let all = tabs.filter { $0.id != "manual" }
+        let open = all.flatMap { s in s.items.filter { $0.status != .completed }.map { (s, $0) } }
+        let mine = open.filter { $0.1.needsYou }
+        let top = mine.first ?? open.first
+        switch family {
+        case .accessoryInline:
+            Text(mine.isEmpty ? "\(open.count) waiting" : "\(mine.count) on you · \(top?.1.content ?? "")")
+                .containerBackground(for: .widget) { Color.clear }
+        case .accessoryCircular:
+            VStack(spacing: 0) {
+                Text("\(mine.isEmpty ? open.count : mine.count)").font(.system(size: 20, weight: .bold, design: .rounded))
+                Image(systemName: mine.isEmpty ? "checklist" : "hand.raised.fill").font(.system(size: 10))
+            }
+            .containerBackground(for: .widget) { AccessoryWidgetBackground() }
+        default:
+            VStack(alignment: .leading, spacing: 1) {
+                Text(mine.isEmpty ? "\(open.count) waiting" : "\(mine.count) on you")
+                    .font(.system(size: 12, weight: .semibold)).widgetAccentable()
+                if let top {
+                    Text(top.1.content).font(.system(size: 14, weight: .semibold)).lineLimit(1)
+                    Text(top.1.suggestion.isEmpty ? top.0.title : "→ " + top.1.suggestion).font(.system(size: 12)).lineLimit(1)
+                } else {
+                    Text("All clear").font(.system(size: 14, weight: .semibold))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .containerBackground(for: .widget) { Color.clear }
+            .widgetURL(top.flatMap { Look.replyURL(ReplyCard(session: $0.0, item: $0.1), edit: true) })
+        }
+    }
+    #endif
+
+    @ViewBuilder private var board: some View {
         let content = VStack(spacing: family == .systemMedium ? 5 : 8) {
             if family == .systemSmall { smallLabel } else { tabStrip }
-            header
-            nowLine
+            if !(family == .systemMedium && card != nil) {
+                header
+                nowLine
+            }
+            if let card { cardView(card.card, index: card.index) }
             rows
             Spacer(minLength: 0)
         }
@@ -160,6 +316,12 @@ struct TodoWidgetView: View {
         }
     }
 
+    #if os(iOS)
+    private static let tapVerb = "open it"
+    #else
+    private static let tapVerb = "resume"
+    #endif
+
     private var smallLabel: some View {
         Text(selected?.title ?? "Claude To-Do").font(.system(size: 10, weight: .semibold))
             .foregroundStyle(Look.dim).lineLimit(1).frame(maxWidth: .infinity)
@@ -167,19 +329,97 @@ struct TodoWidgetView: View {
 
     private var rows: some View {
         VStack(alignment: .leading, spacing: family == .systemLarge ? 10 : 6) {
-            ForEach(openItems.prefix(rowLimit)) { item in
+            ForEach(rowItems.prefix(rowLimit)) { item in
                 row(item)
             }
-            if openItems.count > rowLimit, family != .systemMedium {
-                Text("+\(openItems.count - rowLimit) more").font(.system(size: 10)).foregroundStyle(Look.dim)
+            if rowItems.count > rowLimit, family != .systemMedium {
+                Text("+\(rowItems.count - rowLimit) more").font(.system(size: 10)).foregroundStyle(Look.dim)
             }
             if let s = selected, s.id != "manual", family == .systemLarge {
-                Text("Updated \(Look.ago(s.updatedAt)) · tap a task to resume")
+                Text("Updated \(Look.ago(s.updatedAt)) · tap a task to \(Self.tapVerb)")
                     .font(.system(size: 9.5)).foregroundStyle(Look.dim.opacity(0.8))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 2)
+    }
+
+    private func cardView(_ card: ReplyCard, index: Int) -> some View {
+        let item = card.item
+        let large = family == .systemLarge
+        return VStack(alignment: .leading, spacing: large ? 7 : 5) {
+            HStack(spacing: 6) {
+                Image(systemName: Look.symbol(item)).font(.system(size: 10)).foregroundStyle(Look.tint(item))
+                Text(item.content).font(.system(size: 12, weight: .semibold)).foregroundStyle(Look.text).lineLimit(1)
+                Spacer(minLength: 4)
+                if queue.count > 1 {
+                    Text("\(index + 1)/\(queue.count)").font(.system(size: 9.5, weight: .semibold)).foregroundStyle(Look.dim)
+                    stepButton("chevron.left", -1)
+                    stepButton("chevron.right", 1)
+                }
+            }
+            // the options the suggestion picks from; without them "Approve" would be a blind click
+            if !item.detail.isEmpty {
+                Text(item.detail).font(.system(size: 10.5)).foregroundStyle(Look.dim).lineLimit(large ? 3 : 1)
+            }
+            HStack(alignment: .top, spacing: 5) {
+                Image(systemName: "sparkles").font(.system(size: 9)).foregroundStyle(Look.accent).padding(.top, 2)
+                Text(item.suggestion).font(.system(size: 11)).foregroundStyle(Look.text.opacity(0.88))
+                    .lineLimit(large ? 2 : 1)
+            }
+            .padding(.horizontal, 8).padding(.vertical, 5)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Look.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 7))
+            HStack(spacing: 6) {
+                if entry.sent.contains(card.key) {
+                    Label("Sent to your Mac", systemImage: "checkmark.circle.fill")
+                        .font(.system(size: 10.5, weight: .semibold)).foregroundStyle(Look.accent)
+                        .padding(.vertical, 4)
+                } else {
+                    #if os(iOS)
+                    if preview { cardLink("Approve", "checkmark", nil, primary: true) } else {
+                        Button(intent: ApproveReplyIntent(sessionID: card.session.id, itemID: item.id)) {
+                            cardLabel("Approve", "checkmark", primary: true)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    #else
+                    cardLink("Approve", "checkmark", Look.replyURL(card, edit: false), primary: true)
+                    #endif
+                    cardLink("Edit", "pencil", Look.replyURL(card, edit: true), primary: false)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(9)
+        .background(Look.chip, in: RoundedRectangle(cornerRadius: 11))
+    }
+
+    private func stepButton(_ symbol: String, _ delta: Int) -> some View {
+        Button(intent: StepCardIntent(delta: delta)) {
+            Image(systemName: symbol).font(.system(size: 9, weight: .bold)).foregroundStyle(Look.text)
+                .frame(width: 20, height: 18)
+                .background(Look.chip, in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func cardLink(_ title: String, _ symbol: String, _ url: URL?, primary: Bool) -> some View {
+        let label = cardLabel(title, symbol, primary: primary)
+        if !preview, let url { Link(destination: url) { label } } else { label }
+    }
+
+    private func cardLabel(_ title: String, _ symbol: String, primary: Bool) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: symbol).font(.system(size: 9, weight: .bold))
+            Text(title).font(.system(size: 10.5, weight: .semibold))
+        }
+        .foregroundStyle(primary ? Look.text : Look.dim)
+        .padding(.horizontal, 10).padding(.vertical, 4)
+        // translucent fill + outline, like the tabs: stays readable when macOS tints the widget
+        .background(primary ? Look.accent.opacity(0.30) : Look.chip, in: Capsule())
+        .overlay(Capsule().strokeBorder(Look.accent.opacity(primary ? 0.7 : 0), lineWidth: 1))
     }
 
     @ViewBuilder
@@ -201,7 +441,13 @@ struct TodoWidgetView: View {
             }
             Spacer(minLength: 0)
         }
-        if !preview, let s = selected, s.id != "manual", family != .systemSmall, let url = Look.resumeURL(s.id) {
+        #if os(iOS)
+        // on the phone a tap on a task opens a reply box for it
+        let link = selected.flatMap { s in s.id == "manual" ? nil : Look.replyURL(ReplyCard(session: s, item: item), edit: true) }
+        #else
+        let link = selected.flatMap { s in s.id == "manual" ? nil : Look.resumeURL(s.id) }
+        #endif
+        if !preview, family != .systemSmall, let url = link {
             Link(destination: url) { content }
         } else {
             content

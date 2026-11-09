@@ -25,6 +25,8 @@ struct TodoItem: Identifiable, Hashable, Codable {
     var detail = ""
     /// Waiting on the user (approval, decision, action) rather than on Claude.
     var needsYou = false
+    /// AI-suggested reply that settles the item ("Yes, deploy it"); sent to the session on Approve.
+    var suggestion = ""
 }
 
 extension TodoItem {
@@ -38,6 +40,7 @@ extension TodoItem {
         kind = try c.decodeIfPresent(ItemKind.self, forKey: .kind) ?? .todo
         detail = try c.decodeIfPresent(String.self, forKey: .detail) ?? ""
         needsYou = try c.decodeIfPresent(Bool.self, forKey: .needsYou) ?? false
+        suggestion = try c.decodeIfPresent(String.self, forKey: .suggestion) ?? ""
     }
 }
 
@@ -56,6 +59,8 @@ struct TodoSession: Identifiable, Hashable, Codable {
     var lastPrompt = ""
     /// Live activity of a busy session, e.g. "Editing TodoPanel.swift".
     var nowDoing = ""
+    /// End of Claude's last message, so a suggested reply can be checked against what was actually asked.
+    var lastReply = ""
 
     var openCount: Int { items.filter { $0.status != .completed }.count }
     var doneCount: Int { items.count - openCount }
@@ -75,6 +80,7 @@ extension TodoSession {
         busy = try c.decodeIfPresent(Bool.self, forKey: .busy) ?? false
         lastPrompt = try c.decodeIfPresent(String.self, forKey: .lastPrompt) ?? ""
         nowDoing = try c.decodeIfPresent(String.self, forKey: .nowDoing) ?? ""
+        lastReply = try c.decodeIfPresent(String.self, forKey: .lastReply) ?? ""
     }
 }
 

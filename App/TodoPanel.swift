@@ -6,6 +6,7 @@ struct TodoPanel: View {
     var preview = false
     @State private var draft = ""
     @State private var loginOn = Notifier.launchesAtLogin
+    @State private var swipe = SwipeTracker()
 
     private let tr = Locale(identifier: "tr_TR")
 
@@ -24,6 +25,8 @@ struct TodoPanel: View {
         .frame(minWidth: 280, minHeight: 240)
         .background(Look.bg)
         .environment(\.colorScheme, .dark)
+        .onAppear { if !preview { swipe.start(store) } }
+        .onDisappear { swipe.stop() }
     }
 
     @ViewBuilder
@@ -85,11 +88,8 @@ struct TodoPanel: View {
     }
 
     private func step(_ delta: Int, _ proxy: ScrollViewProxy) {
-        let all = store.sessions
-        guard let cur = all.firstIndex(where: { $0.id == store.selected?.id }) else { return }
-        let next = all[(cur + delta + all.count) % all.count].id
-        store.selectedID = next
-        withAnimation { proxy.scrollTo(next, anchor: .center) }
+        store.step(delta)
+        if let next = store.selectedID { withAnimation { proxy.scrollTo(next, anchor: .center) } }
     }
 
     // MARK: List
@@ -165,6 +165,7 @@ struct TodoPanel: View {
                 if !item.detail.isEmpty {
                     Text(item.detail).font(.system(size: 11)).foregroundStyle(Look.dim)
                 }
+                if !manual, !done, !item.suggestion.isEmpty, let session = store.selected { suggestion(item, in: session) }
             }
             .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
@@ -174,6 +175,39 @@ struct TodoPanel: View {
             .buttonStyle(.plain)
             .help(manual ? "Delete" : "Mark as done")
         }
+    }
+
+    /// The AI-suggested reply with Approve (send as is) and Edit (review it in a small window first).
+    private func suggestion(_ item: TodoItem, in session: TodoSession) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .top, spacing: 5) {
+                Image(systemName: "sparkles").font(.system(size: 9)).foregroundStyle(Look.accent).padding(.top, 2)
+                Text(item.suggestion).font(.system(size: 11.5)).foregroundStyle(Look.text.opacity(0.88))
+            }
+            .padding(.horizontal, 8).padding(.vertical, 5)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Look.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 7))
+            HStack(spacing: 6) {
+                Button { Reply.send(session: session, text: item.suggestion) } label: {
+                    Label("Approve", systemImage: "checkmark").font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(Look.text)
+                        .padding(.horizontal, 9).padding(.vertical, 3)
+                        .background(Look.accent.opacity(0.30), in: Capsule())
+                        .overlay(Capsule().strokeBorder(Look.accent.opacity(0.7), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .help(session.live ? "Copy this reply and bring the session's terminal forward" : "Reopen the session with this reply")
+                Button { ReplyPanel.show(session: session, item: item) } label: {
+                    Label("Edit", systemImage: "pencil").font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(Look.dim)
+                        .padding(.horizontal, 9).padding(.vertical, 3)
+                        .background(Look.chip, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .help("Change the reply before sending it")
+            }
+        }
+        .padding(.top, 3)
     }
 
     // MARK: Input & footer
@@ -201,13 +235,15 @@ struct TodoPanel: View {
             if store.selected?.id == TodoStore.manualID, store.manual.contains(where: { $0.status == .completed }) {
                 footerButton("Clear done") { store.clearCompletedManual() }
             }
-            footerButton(store.smartSummary ? "AI summary: on" : "AI summary: off") { store.smartSummary.toggle() }
+            footerButton(store.smartSummary ? "AI: on" : "AI: off") { store.smartSummary.toggle() }
                 .help("When on, idle sessions are summarized with claude -p (Haiku); each one is a small API call")
             if store.hiddenCount > 0 {
                 footerButton("Restore hidden (\(store.hiddenCount))") { store.restoreHidden() }
                     .help("Show hidden tabs and tasks again")
             }
             if store.smartSummary { footerButton("↻") { store.reanalyze() }.help("Re-analyze all") }
+            footerButton(store.iphoneSync ? "iPhone: on" : "iPhone: off") { store.iphoneSync.toggle() }
+                .help("Show this board on the Claude To-Do iPhone app through your iCloud, and take replies sent from it")
             footerButton(loginOn ? "Login: on" : "Login: off") { Notifier.setLaunchAtLogin(!loginOn); loginOn = Notifier.launchesAtLogin }
                 .help("Start Claude To-Do when you log in")
             footerButton("Quit") { NSApp.terminate(nil) }
@@ -219,6 +255,38 @@ struct TodoPanel: View {
             .buttonStyle(.plain)
             .font(.system(size: 10))
             .foregroundStyle(Look.dim)
+    }
+}
+
+/// Two-finger horizontal swipe on the panel moves to the previous/next tab (the tab row itself keeps scrolling).
+@MainActor
+final class SwipeTracker {
+    private var monitor: Any?
+    private var sum: CGFloat = 0
+    private var fired = false
+    /// Height of the tab row from the top of the panel; swipes there scroll the tabs instead.
+    private let tabRow: CGFloat = 44
+
+    func start(_ store: TodoStore) {
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self, weak store] event in
+            guard let self, let store, event.hasPreciseScrollingDeltas, !(event.window is ReplyPanel) else { return event }
+            if event.phase == .began { sum = 0; fired = false }
+            guard event.phase == .began || event.phase == .changed, !fired,
+                  abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) else { return event }
+            if let height = event.window?.contentView?.bounds.height, height - event.locationInWindow.y < tabRow { return event }
+            sum += event.scrollingDeltaX
+            if abs(sum) > 50 {
+                fired = true
+                store.step(sum < 0 ? 1 : -1)   // content follows the fingers: swipe left shows the next tab
+            }
+            return event
+        }
+    }
+
+    func stop() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
     }
 }
 

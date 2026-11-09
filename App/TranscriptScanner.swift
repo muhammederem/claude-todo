@@ -246,7 +246,7 @@ func buildSessions(from scanned: [ScannedSession], analyzer: SessionAnalyzer?, d
                     items = ai.items.prefix(SessionAnalyzer.maxItems).enumerated().map { i, item in
                         TodoItem(id: "ai-\(i)", content: item.text, activeForm: item.text,
                                  status: item.state == "in_progress" ? .inProgress : .pending, detail: item.detail,
-                                 needsYou: item.needsYou)
+                                 needsYou: item.needsYou, suggestion: item.reply)
                     }
                     .partitioned()   // your items first
                 } else if analyzer.isPending(s.id) {
@@ -263,7 +263,8 @@ func buildSessions(from scanned: [ScannedSession], analyzer: SessionAnalyzer?, d
 
         out.append(TodoSession(id: s.id, title: title, cwd: s.cwd, items: items, updatedAt: s.mtime,
                                auto: auto, analyzing: analyzing, live: s.live, busy: s.busy, lastPrompt: s.turn.lastPrompt,
-                               nowDoing: s.busy ? s.turn.activity : ""))
+                               nowDoing: s.busy ? s.turn.activity : "",
+                               lastReply: items.contains { !$0.suggestion.isEmpty } ? String(s.turn.lastAssistant.suffix(1500)) : ""))
     }
 
     // Running sessions first, then by recency; same-named tabs get a number so they stay distinguishable.

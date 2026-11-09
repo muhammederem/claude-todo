@@ -79,13 +79,27 @@ enum Snapshot {
     }
 }
 
-/// `claudetodo://resume?id=<sessionId>` (a tap on the widget) reopens that session in Terminal.
+/// Widget links: `claudetodo://resume?id=<sessionId>` reopens a session; `claudetodo://reply?id=…&item=…`
+/// sends the item's suggested reply, and with `&edit=1` opens it for editing first.
 final class URLHandler: NSObject, NSApplicationDelegate {
     func application(_ application: NSApplication, open urls: [URL]) {
-        for url in urls where url.scheme == "claudetodo" && url.host == "resume" {
-            guard let id = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "id" })?.value else { continue }
-            let cwd = SharedState.read()?.sessions.first { $0.id == id }?.cwd ?? ""
-            TodoStore.resume(sessionID: id, cwd: cwd)
+        for url in urls where url.scheme == "claudetodo" {
+            let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            func value(_ name: String) -> String? { query.first { $0.name == name }?.value }
+            guard let id = value("id") else { continue }
+            let session = SharedState.read()?.sessions.first { $0.id == id }
+            switch url.host {
+            case "resume":
+                TodoStore.resume(sessionID: id, cwd: session?.cwd ?? "")
+            case "reply":
+                guard let session, let item = session.items.first(where: { $0.id == value("item") }) else { continue }
+                MainActor.assumeIsolated {
+                    if value("edit") == "1" || item.suggestion.isEmpty { ReplyPanel.show(session: session, item: item) }
+                    else { Reply.send(session: session, text: item.suggestion) }
+                }
+            default:
+                continue
+            }
         }
     }
 }

@@ -8,3 +8,5 @@ __pycache__/
 *.pyc
 cli/build/
 cli/*.egg-info/
+iOS/Info.plist
+iOSWidget/Info.plist

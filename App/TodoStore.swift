@@ -19,6 +19,10 @@ final class TodoStore: ObservableObject {
     }
 
     @Published private(set) var hiddenCount = 0
+    /// Mirror the board to the iPhone app through iCloud (off by default).
+    @Published var iphoneSync = CloudSync.shared.enabled {
+        didSet { CloudSync.shared.enabled = iphoneSync; publishForWidget(force: true) }
+    }
     /// Set when the AI summary cannot run (no `claude`, or not logged in).
     @Published private(set) var summaryProblem: String?
     private var dismissed = UserDefaults.standard.dictionary(forKey: "dismissedTabs") as? [String: String] ?? [:]
@@ -64,6 +68,7 @@ final class TodoStore: ObservableObject {
                 guard let self else { return }
                 self.refresh()
                 Notifier.check(self.transcript)
+                CloudSync.shared.tick(sessions: self.transcript)
                 // WidgetKit may drop an individual reload request; a periodic one keeps the widget from going stale
                 if Date().timeIntervalSince(self.lastWidgetReload) > 300 { self.lastWidgetReload = .now; WidgetCenter.shared.reloadAllTimelines() }
             }
@@ -88,7 +93,7 @@ final class TodoStore: ObservableObject {
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 self.fingerprints = prints
-                let problem = smart ? self.analyzer.problem : nil
+                let problem = (smart ? self.analyzer.problem : nil) ?? (self.iphoneSync ? CloudSync.shared.problem : nil)
                 if problem != self.summaryProblem { self.summaryProblem = problem }
                 guard found != self.transcript else { return }
                 self.transcript = found
@@ -104,6 +109,14 @@ final class TodoStore: ObservableObject {
         let scanned = scanner.scan()
         fingerprints = Dictionary(scanned.map { ($0.id, $0.fingerprint) }, uniquingKeysWith: { $1 })
         transcript = buildSessions(from: scanned, analyzer: nil, dismissed: dismissed)
+    }
+
+    /// Moves the selection to the previous/next tab, wrapping around.
+    func step(_ delta: Int) {
+        let all = sessions
+        guard !all.isEmpty else { return }
+        let cur = all.firstIndex { $0.id == selected?.id } ?? 0
+        selectedID = all[(cur + delta + all.count) % all.count].id
     }
 
     /// Hides a tab until its conversation changes again.
@@ -182,9 +195,10 @@ final class TodoStore: ObservableObject {
     }
 
     /// Writes state.json for the widget and nudges WidgetKit, but only when something actually changed.
-    private func publishForWidget() {
+    private func publishForWidget(force: Bool = false) {
         let state = WidgetState(updatedAt: .now, sessions: sessions.filter { !$0.items.isEmpty || $0.analyzing || $0.busy })
-        if let last = published, last.sessions == state.sessions { return }
+        CloudSync.shared.publish(state)
+        if !force, let last = published, last.sessions == state.sessions { return }
         published = state
         SharedState.write(state)
         lastWidgetReload = .now

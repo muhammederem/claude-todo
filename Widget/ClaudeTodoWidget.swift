@@ -15,7 +15,8 @@ struct TodoProvider: TimelineProvider {
     }
 
     private func entry(at date: Date) -> TodoEntry {
-        TodoEntry(date: date, state: SharedState.read() ?? .empty, selectedID: SharedState.readSelection())
+        TodoEntry(date: date, state: SharedState.read() ?? .empty, selectedID: SharedState.readSelection(),
+                  cardKey: SharedState.readCard())
     }
 }
 

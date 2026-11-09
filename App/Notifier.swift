@@ -11,6 +11,7 @@ enum Notifier {
     }
 
     /// Alerts once per task that has waited on the user for 15 minutes while its session sits idle.
+    @MainActor
     static func check(_ sessions: [TodoSession]) {
         var notified = Set(UserDefaults.standard.stringArray(forKey: notifiedKey) ?? [])
         var changed = false
@@ -24,6 +25,7 @@ enum Notifier {
                 content.body = item.detail.isEmpty ? item.content : "\(item.content): \(item.detail)"
                 content.sound = .default
                 UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: key, content: content, trigger: nil))
+                CloudSync.shared.alert(session: s, item: item)
             }
         }
         if changed { UserDefaults.standard.set(Array(notified.suffix(500)), forKey: notifiedKey) }

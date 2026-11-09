@@ -6,12 +6,112 @@ enum TerminalLauncher {
     private static let known = ["Terminal", "iTerm", "Ghostty", "WezTerm", "Warp", "kitty", "Alacritty", "Hyper", "Tabby", "Rio"]
     private static let defaultsKey = "lastTerminalApp"
 
-    static func resume(sessionID: String, cwd: String) {
-        guard sessionID.range(of: #"^[0-9a-fA-F-]{8,64}$"#, options: .regularExpression) != nil else { return }
+    enum ReplyOutcome { case sent, copied, failed }
+
+    /// Answers a session with `text`. A closed session reopens with the text as its first prompt; a running one
+    /// cannot be typed into safely, so the text goes to the clipboard and its terminal comes to the front.
+    @discardableResult
+    static func reply(sessionID: String, cwd: String, text: String) -> ReplyOutcome {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isValid(sessionID), !text.isEmpty else { return .failed }
+        if isRunning(sessionID) {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+            return focusRunning(sessionID) ? .copied : .failed
+        }
+        resume(sessionID: sessionID, cwd: cwd, prompt: text)
+        return .sent
+    }
+
+    static func isRunning(_ sessionID: String) -> Bool {
+        guard let pid = pid(of: sessionID) else { return false }
+        return kill(pid, 0) == 0
+    }
+
+    private static func isValid(_ id: String) -> Bool {
+        id.range(of: #"^[0-9a-fA-F-]{8,64}$"#, options: .regularExpression) != nil
+    }
+
+    /// A reply that came from the iPhone while the user is away from the Mac: a running session in Terminal or iTerm
+    /// gets it typed into its own tab; otherwise the session continues in Claude Desktop when installed, else in a
+    /// new terminal window. Returns what was done, for the phone.
+    static func deliverRemote(sessionID: String, cwd: String, text: String) -> (ok: Bool, note: String) {
+        let flat = text.components(separatedBy: .newlines).joined(separator: " ").trimmingCharacters(in: .whitespaces)
+        guard isValid(sessionID), !flat.isEmpty else { return (false, "Empty reply") }
+        if let pid = pid(of: sessionID), kill(pid, 0) == 0, let host = hostApp(of: pid),
+           let tty = ps(pid, field: "tty").map({ "/dev/" + $0 }), host == "Terminal" || host == "iTerm" {
+            if type(flat, into: tty, host: host) { return (true, "Typed into the session's \(host) tab") }
+        }
+        if let desktop = desktopApp(), let claude = claudePath() {
+            let p = Process()
+            p.executableURL = claude
+            p.arguments = ["--desktop", "--resume", sessionID, flat]
+            p.currentDirectoryURL = URL(fileURLWithPath: FileManager.default.fileExists(atPath: cwd) ? cwd : NSHomeDirectory())
+            if (try? p.run()) != nil { return (true, "Continued in \(desktop)") }
+        }
+        let app = terminal(for: sessionID)
+        resume(sessionID: sessionID, cwd: cwd, prompt: flat, focusExisting: false)
+        return (true, "Continued in a new \(app) window")
+    }
+
+    /// Types a line into the Terminal/iTerm tab that owns `tty` and presses Return. Nothing is sent anywhere else.
+    private static func type(_ text: String, into tty: String, host: String) -> Bool {
+        let t = escapeAS(text)
+        let script = host == "iTerm" ? """
+        tell application "iTerm"
+            repeat with w in windows
+                repeat with t in tabs of w
+                    repeat with s in sessions of t
+                        if tty of s is "\(tty)" then
+                            tell s to write text "\(t)" newline no
+                            delay 0.3
+                            tell s to write text (ASCII character 13) newline no
+                            return "ok"
+                        end if
+                    end repeat
+                end repeat
+            end repeat
+        end tell
+        return "missing"
+        """ : """
+        tell application "Terminal"
+            repeat with w in windows
+                repeat with t in tabs of w
+                    if tty of t is "\(tty)" then
+                        do script "\(t)" in t
+                        return "ok"
+                    end if
+                end repeat
+            end repeat
+        end tell
+        return "missing"
+        """
+        return runCapture(script) == "ok"
+    }
+
+    /// Claude Desktop's name when it is installed.
+    private static func desktopApp() -> String? {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.anthropic.claudefordesktop") != nil ? "Claude Desktop" : nil
+    }
+
+    static func claudePath() -> URL? {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return ["\(home)/.local/bin/claude", "/opt/homebrew/bin/claude", "/usr/local/bin/claude"]
+            .first { FileManager.default.isExecutableFile(atPath: $0) }
+            .map { URL(fileURLWithPath: $0) }
+    }
+
+    static func resume(sessionID: String, cwd: String, prompt: String? = nil, focusExisting: Bool = true) {
+        guard isValid(sessionID) else { return }
         // already open in some terminal: bring that one forward instead of starting a second copy
-        if focusRunning(sessionID) { return }
+        if focusExisting, focusRunning(sessionID) { return }
         let dir = FileManager.default.fileExists(atPath: cwd) ? cwd : NSHomeDirectory()
-        let command = "cd \(shellQuote(dir)) && claude --resume \(sessionID)"
+        var command = "cd \(shellQuote(dir)) && claude --resume \(sessionID)"
+        if let prompt, !prompt.isEmpty {
+            // one line: terminals that type the command would submit at the first newline
+            let flat = prompt.components(separatedBy: .newlines).joined(separator: " ")
+            command += " " + shellQuote(flat)
+        }
         let app = terminal(for: sessionID)
         UserDefaults.standard.set(app, forKey: defaultsKey)
         switch app {
@@ -143,6 +243,20 @@ enum TerminalLauncher {
         p.waitUntilExit()
         let s = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
         return s.isEmpty ? nil : s
+    }
+
+    /// Runs AppleScript and returns its result; gives up after 20 s (e.g. an unanswered permission prompt).
+    private static func runCapture(_ script: String) -> String? {
+        let p = Process(), out = Pipe()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        p.arguments = ["-e", script]
+        p.standardOutput = out
+        p.standardError = FileHandle.nullDevice
+        do { try p.run() } catch { return nil }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 20) { if p.isRunning { p.terminate() } }
+        let data = out.fileHandleForReading.readDataToEndOfFile()
+        p.waitUntilExit()
+        return String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func run(_ script: String) {

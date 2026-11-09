@@ -5,6 +5,18 @@ struct AIItem: Codable, Hashable {
     var detail = ""
     var state: String
     var needsYou = false
+    var reply = ""
+}
+
+extension AIItem {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        text = try c.decode(String.self, forKey: .text)
+        detail = try c.decodeIfPresent(String.self, forKey: .detail) ?? ""
+        state = try c.decodeIfPresent(String.self, forKey: .state) ?? "pending"
+        needsYou = try c.decodeIfPresent(Bool.self, forKey: .needsYou) ?? false
+        reply = try c.decodeIfPresent(String.self, forKey: .reply) ?? ""
+    }
 }
 
 struct Analysis: Codable {
@@ -20,7 +32,7 @@ final class SessionAnalyzer: @unchecked Sendable {
     private static let idleSeconds: TimeInterval = 45
     static let maxItems = 3
     /// Bump when the prompt changes so cached answers are regenerated.
-    private static let promptVersion = "-v4"
+    private static let promptVersion = "-v6"
     private static let retryAfter: TimeInterval = 10 * 60
 
     private static let systemPrompt = """
@@ -36,7 +48,16 @@ final class SessionAnalyzer: @unchecked Sendable {
     Write in English, even if the conversation is in another language. \
     Set "owner" to "you" when the item waits on the user (an approval, a decision, a key or account they must provide, \
     something only they can do) and to "claude" when Claude can just do it. \
-    Reply with only this JSON: {"title":"session name","items":[{"title":"...","detail":"...","state":"in_progress|pending","owner":"you|claude"}]}. \
+    For each item also write "reply": the short message the user could send back to Claude to settle it in one step \
+    (approve, pick an option, answer the question, or tell Claude to go ahead), written as the user would type it and \
+    in the language the user writes in the conversation (e.g. "Evet, prod'a gönder"). \
+    The card is read without the chat, so never point at things the reader cannot see: when Claude offered options, \
+    "detail" names them briefly by their content, and "reply" names the chosen option by its content too \
+    (write "Use the short headline 'Pay once'", never "Go with option B" or "Yes, do that"). \
+    Never make the reply claim the user already did something ("I added the screenshots", "the new copy works") and \
+    never invent a decision Claude did not recommend; in those cases leave "reply" empty. \
+    Keep it under 120 characters. Leave "reply" empty when only the user can act outside the chat (e.g. create a key). \
+    Reply with only this JSON: {"title":"session name","items":[{"title":"...","detail":"...","state":"in_progress|pending","owner":"you|claude","reply":"..."}]}. \
     Use "in_progress" only for what the session is doing right now; everything else is "pending".
     """
 
@@ -126,12 +147,7 @@ final class SessionAnalyzer: @unchecked Sendable {
 
     // MARK: claude -p
 
-    private func claudePath() -> URL? {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return ["\(home)/.local/bin/claude", "/opt/homebrew/bin/claude", "/usr/local/bin/claude"]
-            .first { FileManager.default.isExecutableFile(atPath: $0) }
-            .map { URL(fileURLWithPath: $0) }
-    }
+    private func claudePath() -> URL? { TerminalLauncher.claudePath() }
 
     private func runClaude(input: String) -> Data? {
         guard let exe = claudePath() else { return nil }
@@ -168,8 +184,9 @@ final class SessionAnalyzer: @unchecked Sendable {
         let items = (inner["items"] as? [[String: Any]] ?? []).compactMap { raw -> AIItem? in
             guard let t = ((raw["title"] ?? raw["text"]) as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty else { return nil }
             let d = (raw["detail"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let r = (raw["reply"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             return AIItem(text: t, detail: d, state: raw["state"] as? String == "in_progress" ? "in_progress" : "pending",
-                          needsYou: raw["owner"] as? String == "you")
+                          needsYou: raw["owner"] as? String == "you", reply: String(r.prefix(300)))
         }
         return (inner["title"] as? String ?? "", Array(items.prefix(Self.maxItems)))
     }

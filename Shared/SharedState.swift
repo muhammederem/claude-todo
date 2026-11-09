@@ -14,7 +14,8 @@ struct WidgetState: Codable {
         sessions: [
             TodoSession(id: "demo-1", title: "Checkout", cwd: "", items: [
                 TodoItem(id: "0", content: "Approve the pricing copy", activeForm: "Approve the pricing copy", status: .pending,
-                         detail: "Claude drafted three variants and is waiting for your pick.", needsYou: true),
+                         detail: "Pick a headline: 'Pay once, keep it forever' or 'Simple pricing for teams'.", needsYou: true,
+                         suggestion: "Use the short headline: 'Pay once, keep it forever'"),
                 TodoItem(id: "1", content: "Fix failing Stripe webhook test", activeForm: "Fix failing Stripe webhook test", status: .inProgress,
                          detail: "The retry test times out after the new signature check."),
                 TodoItem(id: "2", content: "Update the order confirmation email", activeForm: "Update the order confirmation email", status: .pending,
@@ -24,7 +25,7 @@ struct WidgetState: Codable {
                 TodoItem(id: "0", content: "Rotate the staging API key", activeForm: "Rotate the staging API key", status: .pending,
                          detail: "The key was pasted into the chat; create a new one.", needsYou: true),
                 TodoItem(id: "1", content: "Run the v2 schema migration", activeForm: "Run the v2 schema migration", status: .pending,
-                         detail: "Dry run passed; waiting for the go-ahead."),
+                         detail: "Dry run passed; waiting for the go-ahead.", suggestion: "Looks good, run the migration"),
             ], updatedAt: .now.addingTimeInterval(-42 * 60), live: true, busy: true, nowDoing: "Running the v2 migration dry run"),
             TodoSession(id: "demo-3", title: "Docs", cwd: "", items: [
                 TodoItem(id: "0", content: "Finish the install guide", activeForm: "Finish the install guide", status: .pending,
@@ -32,7 +33,8 @@ struct WidgetState: Codable {
             ], updatedAt: .now.addingTimeInterval(-3 * 3600), live: false),
             TodoSession(id: "demo-4", title: "Onboarding flow", cwd: "", items: [
                 TodoItem(id: "0", content: "Choose the empty-state illustration", activeForm: "Choose the empty-state illustration", status: .pending,
-                         detail: "Two options generated; needs your decision.", needsYou: true),
+                         detail: "Choose between the hand-drawn map and the flat icon set.", needsYou: true,
+                         suggestion: "Use the hand-drawn map"),
             ], updatedAt: .now.addingTimeInterval(-2 * 24 * 3600), live: false),
         ])
 }
@@ -40,12 +42,33 @@ struct WidgetState: Codable {
 enum SharedState {
     /// Real (unsandboxed) data directory. `CLAUDE_TODO_DATA` points at a manual.json elsewhere, for tests.
     static var directory: URL {
+        #if os(iOS)
+        // the iPhone app and its widget share this group container
+        return FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.muhammederem.claude-todo")
+            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        #else
         if let override = ProcessInfo.processInfo.environment["CLAUDE_TODO_DATA"] {
             return URL(fileURLWithPath: override).deletingLastPathComponent()
         }
         // NSHomeDirectory() is the container inside a sandbox, so ask the user database instead.
         let home = getpwuid(getuid()).map { String(cString: $0.pointee.pw_dir) } ?? NSHomeDirectory()
         return URL(fileURLWithPath: home).appendingPathComponent("Library/Application Support/ClaudeTodo")
+        #endif
+    }
+
+    static var sentURL: URL { directory.appendingPathComponent("widget-sent.json") }
+
+    /// Reply cards already approved from the iPhone widget ("sessionID|itemID"), so they show as sent.
+    static func readSent() -> Set<String> {
+        guard let data = try? Data(contentsOf: sentURL) else { return [] }
+        return (try? JSONDecoder().decode(Set<String>.self, from: data)) ?? []
+    }
+
+    static func markSent(_ key: String) {
+        var all = readSent()
+        all.insert(key)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        if let data = try? JSONEncoder().encode(Set(all.suffix(200))) { try? data.write(to: sentURL, options: .atomic) }
     }
 
     static var manualURL: URL { directory.appendingPathComponent("manual.json") }
@@ -59,6 +82,17 @@ enum SharedState {
 
     static func writeSelection(_ id: String) {
         try? id.write(to: selectionURL, atomically: true, encoding: .utf8)
+    }
+
+    static var cardURL: URL { directory.appendingPathComponent("widget-card.txt") }
+
+    /// The reply card the widget's arrows last landed on, as "sessionID|itemID".
+    static func readCard() -> String? {
+        (try? String(contentsOf: cardURL, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func writeCard(_ key: String) {
+        try? key.write(to: cardURL, atomically: true, encoding: .utf8)
     }
 
     static func read() -> WidgetState? {
