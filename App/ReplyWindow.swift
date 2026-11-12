@@ -9,9 +9,12 @@ enum Reply {
         let (id, cwd, title) = (session.id, session.cwd, session.title)
         DispatchQueue.global(qos: .userInitiated).async {
             switch TerminalLauncher.send(sessionID: id, cwd: cwd, text: text) {
+            case .forked(let app) where app == "Warp" && !AXIsProcessTrusted():
+                notify("Continued in a new Warp window · \(title)",
+                       "To type into the session's own Warp tab instead, allow Leftovers under System Settings › Privacy & Security › Accessibility.")
             case .forked(let app):
                 notify("Continued in a new \(app) window · \(title)",
-                       "\(app) can't type into the tab that already has this session, so a copy of it continues there.")
+                       "Leftovers could not reach the tab that already has this session, so a copy of it continues there.")
             case .failed:
                 notify("Could not reach \(title)", "Open the session with Resume and send the message yourself.")
             case .typed, .opened:

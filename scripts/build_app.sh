@@ -14,4 +14,9 @@ xcodebuild -project ClaudeTodo.xcodeproj -scheme ClaudeTodo -configuration Relea
   -derivedDataPath "$DD" "${SIGN[@]}" build | tail -1
 rm -rf build/Leftovers.app
 ditto --noextattr --norsrc "$DD/Build/Products/Release/Leftovers.app" build/Leftovers.app
+
+# macOS registers every app bundle it sees, and a stale copy's widget can shadow the installed one; forget the build copy
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+"$LSREGISTER" -u "$DD/Build/Products/Release/Leftovers.app" 2>/dev/null || true
+rm -rf "$DD/Build/Products/Release/Leftovers.app"
 echo "Built build/Leftovers.app"

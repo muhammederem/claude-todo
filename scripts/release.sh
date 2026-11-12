@@ -23,6 +23,11 @@ xcodebuild -project ClaudeTodo.xcodeproj -scheme ClaudeTodo -configuration Relea
 ditto --noextattr --norsrc "$DD/Build/Products/Release/Leftovers.app" "$OUT/Leftovers.app"
 codesign --verify --deep --strict --verbose=2 "$OUT/Leftovers.app"
 
+# macOS registers every app bundle it sees, and a stale copy's widget can shadow the installed one; forget the build copy
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+"$LSREGISTER" -u "$DD/Build/Products/Release/Leftovers.app" 2>/dev/null || true
+rm -rf "$DD/Build/Products/Release/Leftovers.app"
+
 # 1) notarize and staple the app
 ditto -c -k --keepParent "$OUT/Leftovers.app" "$OUT/Leftovers.zip"
 xcrun notarytool submit "$OUT/Leftovers.zip" --keychain-profile "$PROFILE" --wait

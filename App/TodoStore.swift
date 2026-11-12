@@ -145,7 +145,8 @@ final class TodoStore: ObservableObject {
 
     /// Reopens the session with `claude --resume` in the user's own terminal.
     nonisolated static func resume(sessionID: String, cwd: String) {
-        TerminalLauncher.resume(sessionID: sessionID, cwd: cwd)
+        // finding a Warp tab runs AppleScript for a moment; keep the panel responsive
+        DispatchQueue.global(qos: .userInitiated).async { TerminalLauncher.resume(sessionID: sessionID, cwd: cwd) }
     }
 
     /// Forget every inferred list and ask the model again.

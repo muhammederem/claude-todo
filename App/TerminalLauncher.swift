@@ -29,6 +29,7 @@ enum TerminalLauncher {
            type(flat, into: "/dev/" + tty, host: host) {
             return .typed(host)
         }
+        if host == "Warp", WarpTabs.type(flat, sessionID: sessionID, claudePID: pid) { return .typed(host) }
         return .forked(launch(sessionID: sessionID, cwd: cwd, prompt: flat, fork: true))
     }
 
@@ -192,6 +193,8 @@ enum TerminalLauncher {
                 end repeat
             end tell
             """)
+        case "Warp" where WarpTabs.type(nil, sessionID: sessionID, claudePID: pid):
+            break
         default:
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/usr/bin/open")
@@ -199,6 +202,11 @@ enum TerminalLauncher {
             try? p.run()
         }
         return true
+    }
+
+    /// Parent process id, from `ps`.
+    static func parent(of pid: Int32) -> Int32? {
+        ps(pid, field: "ppid").flatMap { Int32($0) }
     }
 
     /// First app bundle above the process in the tree, e.g. "Warp".
@@ -254,7 +262,7 @@ enum TerminalLauncher {
         return nil
     }
 
-    private static func ps(_ pid: Int32, field: String) -> String? {
+    static func ps(_ pid: Int32, field: String) -> String? {
         let p = Process(), out = Pipe()
         p.executableURL = URL(fileURLWithPath: "/bin/ps")
         p.arguments = ["-o", field.hasSuffix("=") || field.contains(",") ? field : field + "=", "-p", "\(pid)"]
@@ -268,7 +276,7 @@ enum TerminalLauncher {
     }
 
     /// Runs AppleScript and returns its result; gives up after 20 s (e.g. an unanswered permission prompt).
-    private static func runCapture(_ script: String) -> String? {
+    static func runCapture(_ script: String) -> String? {
         let p = Process(), out = Pipe()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
         p.arguments = ["-e", script]
@@ -296,7 +304,7 @@ enum TerminalLauncher {
         s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
     }
     private static func shellQuote(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
-    private static func escapeAS(_ s: String) -> String {
+    static func escapeAS(_ s: String) -> String {
         s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
     }
 }

@@ -121,10 +121,11 @@ Each Claude Code session gets a tab. A tab shows the session's state (working, o
 | Session state | Terminal | Result |
 | --- | --- | --- |
 | Running | Terminal, iTerm | The task is typed into the session's own tab and submitted. Claude Code queues it if it is still working. |
-| Running | Warp, Ghostty, other | These terminals cannot be scripted to type into one tab, so a new window continues a fork of the session (`claude --resume <id> --fork-session`) with the task. The open tab's conversation is left intact. |
+| Running | Warp | Leftovers switches to the session's tab (⌘1–⌘8), checks that the tab shows the session's title, then pastes the task and presses Return. Needs the Accessibility permission. |
+| Running | Ghostty, other | These terminals cannot be scripted to type into one tab, so a new window continues a fork of the session (`claude --resume <id> --fork-session`) with the task. The open tab's conversation is left intact. |
 | Closed | Any | The session reopens in your terminal (`claude --resume <id> "<task>"`). |
 
-Linux and Windows always use a new terminal window, as in the last two rows.
+If the Warp tab cannot be identified with certainty (no Accessibility permission, a custom tab title, or more than eight tabs in the window), nothing is typed and the fork in a new window is used instead. Linux and Windows always use a new terminal window, as in the last two rows.
 
 ### Suggested replies (macOS)
 
@@ -174,6 +175,7 @@ Leftovers needs no configuration. These environment variables change its default
 | --- | --- |
 | "AI summaries are missing" in the panel | Run `claude` once in a terminal and log in. |
 | A clicked task does nothing in Terminal or iTerm | Allow Leftovers under System Settings → Privacy & Security → Automation. |
+| A clicked task opens a new Warp window instead of the session's tab | Allow Leftovers under System Settings → Privacy & Security → Accessibility. |
 | `leftovers gui` reports a missing library (Linux) | Install the package it names, usually `sudo apt install libxcb-cursor0`. |
 | No tray icon on GNOME | Install the AppIndicator extension, or use the window directly. |
 | The widget shows old data | Open the menu bar panel once; the widget refreshes within a few seconds. |

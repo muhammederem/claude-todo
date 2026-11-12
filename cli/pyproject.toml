@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "leftovers"
-version = "1.2.0"
+version = "1.2.1"
 description = "Leftovers: the unfinished work across your Claude Code sessions (window, tray icon, terminal panel, status-bar output)"
 readme = "README.md"
 requires-python = ">=3.9"
