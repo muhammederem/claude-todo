@@ -43,4 +43,8 @@ xcrun notarytool submit "$OUT/Leftovers.dmg" --keychain-profile "$PROFILE" --wai
 xcrun stapler staple "$OUT/Leftovers.dmg"
 
 spctl --assess --type open --context context:primary-signature -v "$OUT/Leftovers.dmg"
+# only the DMG is the product; drop the app copies so macOS does not keep them registered
+"$LSREGISTER" -u "$OUT/Leftovers.app" 2>/dev/null || true
+"$LSREGISTER" -u "$STAGE/Leftovers.app" 2>/dev/null || true
+rm -rf "$OUT/Leftovers.app" "$OUT/Leftovers.zip" "$STAGE"
 echo "Built $OUT/Leftovers.dmg"
