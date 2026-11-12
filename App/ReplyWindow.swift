@@ -2,16 +2,32 @@ import AppKit
 import SwiftUI
 import UserNotifications
 
-/// Sends an AI-suggested (or edited) reply to a session and tells the user what happened.
+/// Sends a message to a session (an approved or edited reply, or a task the user clicked) and says where it went
+/// when that is not obvious from the screen.
 enum Reply {
-    @MainActor
     static func send(session: TodoSession, text: String) {
-        switch TerminalLauncher.reply(sessionID: session.id, cwd: session.cwd, text: text) {
-        case .copied:
-            notify("Reply copied · \(session.title)", "The session is still open: paste with ⌘V and press Return.")
-        case .sent, .failed:
-            break
+        let (id, cwd, title) = (session.id, session.cwd, session.title)
+        DispatchQueue.global(qos: .userInitiated).async {
+            switch TerminalLauncher.send(sessionID: id, cwd: cwd, text: text) {
+            case .forked(let app):
+                notify("Continued in a new \(app) window · \(title)",
+                       "\(app) can't type into the tab that already has this session, so a copy of it continues there.")
+            case .failed:
+                notify("Could not reach \(title)", "Open the session with Resume and send the message yourself.")
+            case .typed, .opened:
+                break
+            }
         }
+    }
+
+    /// A click on a task: the session gets the task as its next message.
+    static func task(session: TodoSession, item: TodoItem) {
+        send(session: session, text: prompt(for: item))
+    }
+
+    static func prompt(for item: TodoItem) -> String {
+        if item.kind == .resume { return "Continue where you left off." }
+        return item.detail.isEmpty ? item.content : "\(item.content): \(item.detail)"
     }
 
     private static func notify(_ title: String, _ body: String) {
@@ -51,14 +67,12 @@ struct ReplyView: View {
     let item: TodoItem
     let close: () -> Void
     @State private var text: String
-    private let running: Bool
 
     init(session: TodoSession, item: TodoItem, close: @escaping () -> Void) {
         self.session = session
         self.item = item
         self.close = close
         _text = State(initialValue: item.suggestion)
-        running = TerminalLauncher.isRunning(session.id)
     }
 
     var body: some View {
@@ -89,13 +103,12 @@ struct ReplyView: View {
                 .padding(6)
                 .background(Look.chip, in: RoundedRectangle(cornerRadius: 8))
                 .frame(minHeight: 70)
-            Text(running ? "The session is open: the reply is copied and its terminal comes to the front."
-                         : "The session is closed: it reopens in your terminal with this reply.")
+            Text("Goes to the session as your next message: typed into its tab in Terminal or iTerm, otherwise the session continues in a new terminal window.")
                 .font(.system(size: 10.5)).foregroundStyle(Look.dim)
             HStack {
                 Spacer()
                 Button("Cancel", action: close).keyboardShortcut(.cancelAction)
-                Button(running ? "Copy & open" : "Send") {
+                Button("Send") {
                     Reply.send(session: session, text: text)
                     close()
                 }

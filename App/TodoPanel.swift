@@ -158,12 +158,23 @@ struct TodoPanel: View {
             .buttonStyle(.plain)
             .disabled(!manual)
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.status == .inProgress ? item.activeForm : item.content)
-                    .font(.system(size: 12.5, weight: item.detail.isEmpty ? .regular : .semibold))
-                    .foregroundStyle(done ? Look.dim : Look.text)
-                    .strikethrough(done)
-                if !item.detail.isEmpty {
-                    Text(item.detail).font(.system(size: 11)).foregroundStyle(Look.dim)
+                let text = VStack(alignment: .leading, spacing: 2) {
+                    Text(item.status == .inProgress ? item.activeForm : item.content)
+                        .font(.system(size: 12.5, weight: item.detail.isEmpty ? .regular : .semibold))
+                        .foregroundStyle(done ? Look.dim : Look.text)
+                        .strikethrough(done)
+                    if !item.detail.isEmpty {
+                        Text(item.detail).font(.system(size: 11)).foregroundStyle(Look.dim)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                if !manual, !done, let session = store.selected {
+                    Button { Reply.task(session: session, item: item) } label: { text }
+                        .buttonStyle(.plain)
+                        .help("Send this task to the session in its terminal")
+                } else {
+                    text
                 }
                 if !manual, !done, !item.suggestion.isEmpty, let session = store.selected { suggestion(item, in: session) }
             }
@@ -196,7 +207,7 @@ struct TodoPanel: View {
                         .overlay(Capsule().strokeBorder(Look.accent.opacity(0.7), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
-                .help(session.live ? "Copy this reply and bring the session's terminal forward" : "Reopen the session with this reply")
+                .help("Send this reply to the session in its terminal")
                 Button { ReplyPanel.show(session: session, item: item) } label: {
                     Label("Edit", systemImage: "pencil").font(.system(size: 10.5, weight: .semibold))
                         .foregroundStyle(Look.dim)
@@ -235,17 +246,15 @@ struct TodoPanel: View {
             if store.selected?.id == TodoStore.manualID, store.manual.contains(where: { $0.status == .completed }) {
                 footerButton("Clear done") { store.clearCompletedManual() }
             }
-            footerButton(store.smartSummary ? "AI: on" : "AI: off") { store.smartSummary.toggle() }
+            footerButton(store.smartSummary ? "AI summary: on" : "AI summary: off") { store.smartSummary.toggle() }
                 .help("When on, idle sessions are summarized with claude -p (Haiku); each one is a small API call")
             if store.hiddenCount > 0 {
                 footerButton("Restore hidden (\(store.hiddenCount))") { store.restoreHidden() }
                     .help("Show hidden tabs and tasks again")
             }
             if store.smartSummary { footerButton("↻") { store.reanalyze() }.help("Re-analyze all") }
-            footerButton(store.iphoneSync ? "iPhone: on" : "iPhone: off") { store.iphoneSync.toggle() }
-                .help("Show this board on the Claude To-Do iPhone app through your iCloud, and take replies sent from it")
             footerButton(loginOn ? "Login: on" : "Login: off") { Notifier.setLaunchAtLogin(!loginOn); loginOn = Notifier.launchesAtLogin }
-                .help("Start Claude To-Do when you log in")
+                .help("Start Leftovers when you log in")
             footerButton("Quit") { NSApp.terminate(nil) }
         }
     }

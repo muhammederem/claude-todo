@@ -33,19 +33,19 @@ jobs:
           sudo apt-get remove -y libxcb-cursor0 || true
           ! dpkg -s libxcb-cursor0 2>/dev/null | grep -q "Status: install ok installed"
       - name: Install the .deb (apt must pull the dependencies)
-        run: sudo apt-get update && sudo apt-get install -y ./claude-todo_*.deb xvfb desktop-file-utils
+        run: sudo apt-get update && sudo apt-get install -y ./leftovers_*.deb xvfb desktop-file-utils
       - name: apt installed the missing library
         run: |
           dpkg -s libxcb-cursor0 | grep "Status: install ok installed"
-      - run: claude-todo --version
-      - run: claude-todo list --no-ai
+      - run: leftovers --version && claude-todo --version
+      - run: leftovers list --no-ai
       - name: Open the real window on X11 (xcb plugin) and check it drew
         run: |
           unset QT_QPA_PLATFORM
-          xvfb-run -a claude-todo gui --no-ai --smoke "$RUNNER_TEMP/smoke.txt"
+          xvfb-run -a leftovers gui --no-ai --smoke "$RUNNER_TEMP/smoke.txt"
           cat "$RUNNER_TEMP/smoke.txt"
           grep -q "^ok platform=xcb" "$RUNNER_TEMP/smoke.txt"
-      - run: desktop-file-validate /usr/share/applications/claude-todo.desktop
-      - run: test -s /usr/share/icons/hicolor/256x256/apps/claude-todo.png
+      - run: desktop-file-validate /usr/share/applications/leftovers.desktop
+      - run: test -s /usr/share/icons/hicolor/256x256/apps/leftovers.png
       - name: Remove cleanly
-        run: sudo apt-get remove -y claude-todo && ! test -e /usr/bin/claude-todo
+        run: sudo apt-get remove -y leftovers && ! test -e /usr/bin/leftovers

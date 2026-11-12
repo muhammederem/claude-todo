@@ -25,7 +25,6 @@ enum Notifier {
                 content.body = item.detail.isEmpty ? item.content : "\(item.content): \(item.detail)"
                 content.sound = .default
                 UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: key, content: content, trigger: nil))
-                CloudSync.shared.alert(session: s, item: item)
             }
         }
         if changed { UserDefaults.standard.set(Array(notified.suffix(500)), forKey: notifiedKey) }

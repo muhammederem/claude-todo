@@ -61,23 +61,36 @@ def _is_windows() -> bool:
 _CMD_UNSAFE = set('&|<>^%"\n\r')
 
 
-def _windows_resume_argv(session_id: str, cwd: str) -> List[str]:
+def _one_line(text: str) -> str:
+    return " ".join(part.strip() for part in text.splitlines() if part.strip())
+
+
+def _claude_args(session_id: str, prompt: Optional[str], fork: bool) -> List[str]:
+    """`--fork-session` continues a copy of a session that is still open elsewhere, leaving that one intact."""
+    args = ["claude", "--resume", session_id] + (["--fork-session"] if fork else [])
+    return args + ([_one_line(prompt)] if prompt and _one_line(prompt) else [])
+
+
+def _windows_resume_argv(session_id: str, cwd: str, prompt: Optional[str] = None, fork: bool = False) -> List[str]:
     """Windows Terminal if present, otherwise a new cmd window. The id is validated hex, and a folder that cmd could
     misread (& | < > ^ % ") is replaced by the home folder, since cmd re-parses its command line."""
     if not re.fullmatch(r"[0-9a-fA-F-]{8,64}", session_id):
         raise ValueError("bad session id")
     folder = cwd if cwd and os.path.isdir(cwd) and not (set(cwd) & _CMD_UNSAFE) else os.path.expanduser("~")
     if shutil.which("wt"):
-        return ["wt", "-d", folder, "--", "claude", "--resume", session_id]
-    return ["cmd", "/c", "start", "", "/D", folder, "cmd", "/k", "claude", "--resume", session_id]
+        return ["wt", "-d", folder, "--"] + _claude_args(session_id, prompt, fork)
+    # cmd re-parses the line, so the prompt loses the characters it would misread
+    safe = "".join(c for c in prompt or "" if c not in _CMD_UNSAFE)
+    return ["cmd", "/c", "start", "", "/D", folder, "cmd", "/k"] + _claude_args(session_id, safe, fork)
 
 
-def resume_command(session_id: str, cwd: str) -> List[str]:
+def resume_command(session_id: str, cwd: str, prompt: Optional[str] = None, fork: bool = False) -> List[str]:
     if not re.fullmatch(r"[0-9a-fA-F-]{8,64}", session_id):
         raise ValueError("bad session id")
     shell = os.environ.get("SHELL") or "/bin/sh"
     folder = cwd if cwd and os.path.isdir(cwd) else os.path.expanduser("~")
-    script = f"cd {shlex.quote(folder)} && claude --resume {session_id}; exec {shlex.quote(shell)}"
+    claude = " ".join(shlex.quote(a) for a in _claude_args(session_id, prompt, fork))
+    script = f"cd {shlex.quote(folder)} && {claude}; exec {shlex.quote(shell)}"
     return ["sh", "-c", script]
 
 
@@ -102,14 +115,15 @@ def terminal_argv(terminal: str, inner: List[str]) -> List[str]:
     return [terminal, "-e"] + inner
 
 
-def resume(session_id: str, cwd: str, pid: Optional[int] = None, dry_run: bool = False) -> List[str]:
-    """Opens `claude --resume` in a new terminal window; returns the command it ran."""
+def resume(session_id: str, cwd: str, pid: Optional[int] = None, dry_run: bool = False,
+           prompt: Optional[str] = None, fork: bool = False) -> List[str]:
+    """Opens `claude --resume` in a new terminal window, with `prompt` as the first message; returns the command."""
     if _is_windows():
-        argv = _windows_resume_argv(session_id, cwd)
+        argv = _windows_resume_argv(session_id, cwd, prompt, fork)
         if not dry_run:
             subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL)
         return argv
-    inner = resume_command(session_id, cwd)
+    inner = resume_command(session_id, cwd, prompt, fork)
     terminal = pick_terminal(pid)
     if terminal is None:
         raise RuntimeError("No terminal emulator found. Set $TERMINAL or CLAUDE_TODO_TERMINAL.")

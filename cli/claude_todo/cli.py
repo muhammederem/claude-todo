@@ -1,4 +1,4 @@
-"""`claude-todo`: terminal panel plus plain, JSON and status-bar outputs."""
+"""`leftovers` (also installed as `claude-todo`): terminal panel plus plain, JSON and status-bar outputs."""
 import argparse
 import json
 import sys
@@ -89,8 +89,24 @@ def open_session(s: Session) -> str:
     return "Opened in " + argv[0] + "."
 
 
+def task_prompt(item) -> str:
+    if getattr(item, "kind", "") == "resume":
+        return "Continue where you left off."
+    return f"{item.content}: {item.detail}" if item.detail else item.content
+
+
+def send_task(s: Session, item) -> str:
+    """A click on a task: the session gets it as its next message. A session still open in a terminal can't be typed
+    into from here, so a new window continues a fork of it."""
+    if s.id == MANUAL_ID:
+        return "That tab is yours; nothing to send."
+    running = bool(s.live and s.pid)
+    argv = terminals.resume(s.id, s.cwd, s.pid, prompt=task_prompt(item), fork=running)
+    return ("Continued a copy in " if running else "Sent to the session in ") + argv[0] + "."
+
+
 def main(argv: Optional[List[str]] = None) -> int:
-    p = argparse.ArgumentParser(prog="claude-todo", description="What is still open across your Claude Code sessions.")
+    p = argparse.ArgumentParser(prog="leftovers", description="What is still open across your Claude Code sessions.")
     p.add_argument("command", nargs="?", default="ui",
                    choices=["ui", "gui", "list", "json", "waybar", "add", "done", "hide", "restore", "resume", "reset"],
                    help="ui (default, terminal) | gui (window + tray) | list | json | waybar | add TEXT | done SESSION N | hide SESSION | restore | resume SESSION | reset")
@@ -147,7 +163,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         else:
             idx = int(a.args[1]) - 1 if len(a.args) > 1 and a.args[1].isdigit() else -1
             if not 0 <= idx < len(s.items):
-                print("done needs the task number from `claude-todo list`: claude-todo done SESSION N", file=sys.stderr)
+                print("done needs the task number from `leftovers list`: leftovers done SESSION N", file=sys.stderr)
                 return 1
             if s.id == MANUAL_ID:
                 manual.toggle(s.items[idx].id)
@@ -164,14 +180,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         try:
             from .gui import run as run_gui
         except ImportError:
-            print("The window needs PySide6: pip install \"claude-todo[gui]\"", file=sys.stderr)
+            print("The window needs PySide6: pip install \"leftovers[gui]\"", file=sys.stderr)
             return 1
         return run_gui(scanner, analyzer, hidden, manual, start_hidden=a.tray, smoke=a.smoke)
     else:
         try:
             from .tui import run
         except ImportError:        # no curses on Windows
-            print("The terminal panel needs curses, which Windows lacks. Use `claude-todo gui`, or `claude-todo list`.", file=sys.stderr)
+            print("The terminal panel needs curses, which Windows lacks. Use `leftovers gui`, or `leftovers list`.", file=sys.stderr)
             return 1
         return run(scanner, analyzer, hidden, manual)
     return 0

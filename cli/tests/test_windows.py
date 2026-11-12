@@ -30,6 +30,16 @@ class WindowsLaunch(unittest.TestCase):
         self.assertEqual(argv[-3:], ["claude", "--resume", SID])
         self.assertIn(self.folder, argv)
 
+    def test_task_prompt_and_fork(self):
+        with mock.patch.object(terminals.shutil, "which", return_value="wt.exe"):
+            argv = terminals.resume(SID, self.folder, dry_run=True, prompt="Fix it\nnow", fork=True)
+        self.assertEqual(argv[-4:], ["--resume", SID, "--fork-session", "Fix it now"])
+
+    def test_cmd_prompt_loses_characters_cmd_would_misread(self):
+        with mock.patch.object(terminals.shutil, "which", return_value=None):
+            argv = terminals.resume(SID, self.folder, dry_run=True, prompt='a & calc | "x" 100%')
+        self.assertEqual(argv[-1], "a  calc  x 100")
+
     def test_folders_cmd_could_misread_fall_back_to_home(self):
         for nasty in ("C:\\a&calc", "C:\\a|b", 'C:\\a"b', "C:\\100%", "C:\\a^b"):
             with self.subTest(nasty=nasty), mock.patch.object(terminals.shutil, "which", return_value=None), \

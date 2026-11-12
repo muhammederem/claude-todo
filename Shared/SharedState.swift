@@ -42,33 +42,12 @@ struct WidgetState: Codable {
 enum SharedState {
     /// Real (unsandboxed) data directory. `CLAUDE_TODO_DATA` points at a manual.json elsewhere, for tests.
     static var directory: URL {
-        #if os(iOS)
-        // the iPhone app and its widget share this group container
-        return FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.muhammederem.claude-todo")
-            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        #else
         if let override = ProcessInfo.processInfo.environment["CLAUDE_TODO_DATA"] {
             return URL(fileURLWithPath: override).deletingLastPathComponent()
         }
         // NSHomeDirectory() is the container inside a sandbox, so ask the user database instead.
         let home = getpwuid(getuid()).map { String(cString: $0.pointee.pw_dir) } ?? NSHomeDirectory()
         return URL(fileURLWithPath: home).appendingPathComponent("Library/Application Support/ClaudeTodo")
-        #endif
-    }
-
-    static var sentURL: URL { directory.appendingPathComponent("widget-sent.json") }
-
-    /// Reply cards already approved from the iPhone widget ("sessionID|itemID"), so they show as sent.
-    static func readSent() -> Set<String> {
-        guard let data = try? Data(contentsOf: sentURL) else { return [] }
-        return (try? JSONDecoder().decode(Set<String>.self, from: data)) ?? []
-    }
-
-    static func markSent(_ key: String) {
-        var all = readSent()
-        all.insert(key)
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        if let data = try? JSONEncoder().encode(Set(all.suffix(200))) { try? data.write(to: sentURL, options: .atomic) }
     }
 
     static var manualURL: URL { directory.appendingPathComponent("manual.json") }

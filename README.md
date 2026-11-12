@@ -1,113 +1,215 @@
-# Claude To-Do
+# Leftovers
 
-Shows what is still unfinished across your Claude Code sessions, one tab per session: a menu bar app and desktop widget on **macOS**, a window with a tray icon on **Linux** and **Windows**.
+[![cli](https://github.com/muhammederem/claude-todo/actions/workflows/cli.yml/badge.svg)](https://github.com/muhammederem/claude-todo/actions/workflows/cli.yml)
+[![packages](https://github.com/muhammederem/claude-todo/actions/workflows/packages.yml/badge.svg)](https://github.com/muhammederem/claude-todo/actions/workflows/packages.yml)
+[![release](https://img.shields.io/github/v/release/muhammederem/claude-todo)](https://github.com/muhammederem/claude-todo/releases/latest)
+[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-- **Zero setup.** It reads Claude Code's own session files (`~/.claude`); no hooks, no config, nothing to type in.
-- **Real to-dos, not chat snippets.** Each open item has a short title and a one-line explanation, and the ones waiting on *you* (an approval, a decision, a key) are marked and listed first.
-- **Menu bar panel and a small/medium/large desktop widget**, with a tab per session. Tap a task to reopen that session with `claude --resume` in the terminal you use (Terminal, iTerm, Warp, Ghostty, …).
-- **Live view.** A session that is busy shows what it is doing right now ("Editing panel.py"). Opening a task of a session that is already running brings its terminal forward instead of starting a second copy.
-- **Suggested replies (macOS).** When a session is waiting on you, the AI drafts the reply you would likely send, with the options spelled out ("Use the short headline: 'Pay once, keep it forever'"). Approve it from the widget or panel, or edit it first; swipe left and right in the panel (‹ › in the widget) to move between them. A closed session is reopened with the reply; for a running one the reply is copied and its terminal brought forward.
-- **iPhone companion (optional, off by default).** Home Screen and Lock Screen widgets show the same board; approve or edit a reply there, or answer straight from the "waiting on you" notification, and your Mac types it into the session. See [iPhone](#iphone).
-- Mark a task done, hide a tab, and add your own tasks in the "Mine" tab.
-- Optional notification when something has been waiting on you for 15 minutes.
+Leftovers tracks the unfinished work across your [Claude Code](https://claude.com/claude-code) sessions. It reads Claude Code's local session files, extracts the open tasks of each session, and marks the ones that are waiting on you. It runs as a menu bar app with a desktop widget on macOS, and as a window with a tray icon on Linux and Windows.
 
 <p align="center">
   <img src="docs/widgets.png" alt="Small, medium and large desktop widgets" width="640"><br>
   <img src="docs/panel.png" alt="Menu bar panel" width="300">
 </p>
 
-*Screenshots use made-up sample sessions.*
+<sub>Screenshots use made-up sample sessions.</sub>
 
-## Install
+## Contents
 
-### macOS 15+
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+- [How it works](#how-it-works)
+- [Privacy](#privacy)
+- [Configuration](#configuration)
+- [Troubleshooting](#troubleshooting)
+- [Building from source](#building-from-source)
+- [License](#license)
 
-Homebrew:
+## Features
 
-```sh
-brew tap muhammederem/claude-todo
-brew trust muhammederem/claude-todo   # newer Homebrew only loads casks from third-party taps you trust
-brew install claude-todo
-```
+| | macOS | Linux | Windows |
+| --- | :---: | :---: | :---: |
+| One tab per session, open tasks with a one-line explanation | ✓ | ✓ | ✓ |
+| Tasks waiting on you (approval, decision, credentials) marked and listed first | ✓ | ✓ | ✓ |
+| Live status of a busy session ("Editing panel.py") | ✓ | ✓ | ✓ |
+| Click a task to send it to its session | ✓ | ✓ | ✓ |
+| AI-suggested reply with Approve / Edit | ✓ | | |
+| Desktop widget (small, medium, large) | ✓ | | |
+| Menu bar panel / tray icon | ✓ | ✓ | ✓ |
+| Terminal panel and status-bar output (waybar, polybar) | | ✓ | |
+| Notification after a task has waited on you for 15 minutes | ✓ | ✓ | ✓ |
+| Personal tasks ("Mine" tab), hide, mark done, start at login | ✓ | ✓ | ✓ |
 
-or download `ClaudeTodo.dmg` from the Releases page and drag the app to Applications. Then add the widget: right-click the desktop, **Edit Widgets**, search "Claude To-Do".
+No configuration and no hooks are needed: everything comes from the files Claude Code already writes under `~/.claude`.
 
-Requires [Claude Code](https://claude.com/claude-code), installed and **logged in** (run `claude` once in a terminal). Without it the app still lists sessions with simple rules, and the panel tells you why the AI summaries are missing.
+## Requirements
 
-### iPhone
+- [Claude Code](https://claude.com/claude-code), installed and **logged in** (run `claude` once in a terminal). Without it, Leftovers still lists sessions using simple rules and reports why the AI summaries are missing.
+- **macOS** 15 or later.
+- **Linux**: Python 3.9 or later, or Debian/Ubuntu on amd64 for the `.deb` package. The tray icon needs a system-tray host (built in on KDE, XFCE and Cinnamon; GNOME needs the AppIndicator extension).
+- **Windows** 10 or later with Python 3.9 or later.
 
-The iPhone app is a widget with a small setup screen. It talks only to your Mac, through your own private iCloud database: no server of ours, and the Claude app is not needed on the phone.
+## Installation
 
-1. On the Mac, switch **iPhone: on** in the panel footer (the Mac must be signed in to iCloud).
-2. Install the iPhone app (not on the App Store yet; build `ClaudeTodoPhone` from source, see below) and sign in to the same Apple Account.
-3. Add the **Claude To-Do** widget to the Home Screen (medium or large shows the suggested reply) and, if you like, the Lock Screen.
+### One-line install
 
-A reply sent from the phone goes to the session on your Mac:
-
-- the session is running in **Terminal** or **iTerm**: typed into that tab once Claude has finished its turn;
-- otherwise, **Claude Desktop** if it is installed;
-- otherwise a new terminal window (Terminal, iTerm, Warp, Ghostty, …) resumes the session with your reply.
-
-The Mac has to be awake; replies sent while it sleeps wait in iCloud and go through when it wakes. The setup screen shows whether each reply was delivered.
-
-### Linux
-
-A window with a tray icon, like the macOS panel (tabs per session, waiting-on-you marking, live view, resume, notifications, start at login).
-
-**Ubuntu / Debian (amd64):** download `claude-todo_<version>_amd64.deb` from the [Releases page](https://github.com/muhammederem/claude-todo/releases) and install it; apt pulls in every system library Qt needs:
-
-```sh
-sudo apt install ./claude-todo_*_amd64.deb
-```
-
-Then start **Claude To-Do** from the app menu, or run `claude-todo gui`.
-
-**Other distributions, or from source** (needs Python 3.9+):
+macOS and Linux:
 
 ```sh
-pipx install "claude-todo[gui] @ git+https://github.com/muhammederem/claude-todo#subdirectory=cli"
-claude-todo gui
+curl -fsSL https://raw.githubusercontent.com/muhammederem/claude-todo/main/install.sh | sh
 ```
 
-With pip you install Qt's system libraries yourself; if one is missing, `claude-todo gui` tells you the exact command instead of crashing (on Ubuntu usually `sudo apt install libxcb-cursor0`).
+Windows (PowerShell):
 
-### Windows
+```powershell
+irm https://raw.githubusercontent.com/muhammederem/claude-todo/main/install.ps1 | iex
+```
+
+What the installer does:
+
+| System | Result |
+| --- | --- |
+| macOS | Downloads the signed, notarized app from the latest release into `/Applications` (or `~/Applications`) and starts it. |
+| Debian / Ubuntu (amd64) | Installs the release's `.deb` with apt, which also pulls in the system libraries Qt needs. |
+| Other Linux | Installs the Python package with pipx, or into its own virtual environment under `~/.local/share/leftovers`, and links `leftovers` into `~/.local/bin`. |
+| Windows | Installs the Python package into `%LOCALAPPDATA%\Leftovers`, adds a Start menu entry and starts the app. |
+
+Set `LEFTOVERS_VERSION=v1.2.0` to install a specific release instead of the latest. Both scripts are short; read them before piping them to a shell if you prefer: [install.sh](install.sh), [install.ps1](install.ps1).
+
+### Other ways
+
+- **Homebrew (macOS)**
+  ```sh
+  brew tap muhammederem/claude-todo
+  brew install claude-todo
+  ```
+- **Manual download**: `.dmg` (macOS) and `.deb` (Debian/Ubuntu) from the [releases page](https://github.com/muhammederem/claude-todo/releases).
+- **pip / pipx**
+  ```sh
+  pipx install "leftovers[gui] @ git+https://github.com/muhammederem/claude-todo#subdirectory=cli"
+  ```
+
+On macOS, add the widget with a right-click on the desktop → **Edit Widgets** → search "Leftovers".
+
+### Uninstall
+
+| Installed with | Remove with |
+| --- | --- |
+| macOS installer or `.dmg` | Quit the app and delete `Leftovers.app` from Applications |
+| Homebrew | `brew uninstall --cask claude-todo` |
+| `.deb` | `sudo apt remove leftovers` |
+| Linux installer | `pipx uninstall leftovers`, or `rm -rf ~/.local/share/leftovers ~/.local/bin/leftovers` |
+| Windows installer | Delete `%LOCALAPPDATA%\Leftovers` and the Start menu entry |
+
+Cached summaries live in `~/Library/Application Support/ClaudeTodo` (macOS), `~/.local/state/claude-todo` (Linux) and `%LOCALAPPDATA%\claude-todo` (Windows).
+
+## Usage
+
+### Panel and widget
+
+Each Claude Code session gets a tab. A tab shows the session's state (working, open, closed) and up to three open tasks; tasks that are waiting on you come first and are marked with a hand icon.
+
+- **Click a task** to send it to its session as your next message.
+- **Resume** reopens the session, or brings its terminal to the front if it is already running.
+- **✓** marks a task done; **Hide** hides the tab until the session changes again.
+- **Mine** holds tasks you add yourself.
+
+### Where a clicked task goes
+
+| Session state | Terminal | Result |
+| --- | --- | --- |
+| Running | Terminal, iTerm | The task is typed into the session's own tab and submitted. Claude Code queues it if it is still working. |
+| Running | Warp, Ghostty, other | These terminals cannot be scripted to type into one tab, so a new window continues a fork of the session (`claude --resume <id> --fork-session`) with the task. The open tab's conversation is left intact. |
+| Closed | Any | The session reopens in your terminal (`claude --resume <id> "<task>"`). |
+
+Linux and Windows always use a new terminal window, as in the last two rows.
+
+### Suggested replies (macOS)
+
+When a session is waiting on a decision, the AI drafts the reply you would most likely send, with the options spelled out (for example *"Use the short headline: 'Pay once, keep it forever'"*). **Approve** sends it as is; **Edit** opens it in a small window together with Claude's last message. Swipe left and right in the panel, or use ‹ › on the widget, to move between suggestions.
+
+### Command line (Linux)
 
 ```sh
-py -m pip install "claude-todo[gui] @ git+https://github.com/muhammederem/claude-todo#subdirectory=cli"
-claude-todo-gui
+leftovers            # interactive terminal panel
+leftovers gui        # window + tray icon
+leftovers list       # plain text; tasks are numbered
+leftovers json       # machine-readable
+leftovers waybar     # one JSON line for waybar / polybar
 ```
 
-A packaged installer is planned.
-
-There is also a terminal panel and a status-bar module (waybar, polybar) on Linux; see [cli/README.md](cli/README.md). There is no desktop widget on Linux or Windows.
-
-<p align="center"><img src="docs/window.png" alt="Linux and Windows window" width="300"></p>
+See [cli/README.md](cli/README.md) for every command, the panel's key bindings and status-bar setup. `claude-todo` remains available as an alias of `leftovers`.
 
 ## How it works
 
-1. A scanner reads the recent session transcripts in `~/.claude/projects` and the live-session registry in `~/.claude/sessions`.
-2. When a session goes idle, your own `claude -p --model haiku` summarizes the end of the conversation into at most three open tasks. Results are cached and re-run only when the session changes.
-3. The app publishes the result to a small JSON file that the widget reads.
-4. With **iPhone: on**, the same board is written to a record in your private iCloud database (CloudKit). The phone reads it and leaves replies there; the Mac checks for them every 10 seconds.
+```
+~/.claude/projects/*.jsonl ──► scanner ──► analyzer (claude -p --model haiku) ──► state.json ──► panel / widget
+~/.claude/sessions/*.json  ──┘   (live sessions, PIDs)                             (cached per session)
+```
+
+1. **Scanner** reads recent session transcripts in `~/.claude/projects` and the live-session registry in `~/.claude/sessions`, which gives each running session's process, and from it its terminal.
+2. **Analyzer**: when a session goes idle, your own `claude` CLI summarizes the end of the conversation into at most three open tasks, each with a one-line explanation, a waiting-on-you flag and, where it fits, a suggested reply. Results are cached and recomputed only when the session changes.
+3. **Publisher** writes the result to a small JSON file that the widget extension reads. The panel, widget and Linux/Windows window render the same data.
 
 ## Privacy
 
-Nothing leaves your machine except what Claude Code itself sends. The AI summary passes the tail of a conversation to the model **through your own `claude` CLI and login** (a few tenths of a cent per summary; no API key, no third-party service). Turn it off with **AI summary** in the panel footer; the app then falls back to simple rules and shows rougher results.
+Leftovers has no server and sends no telemetry. The only network traffic is what Claude Code itself sends: the AI summary passes the tail of a conversation to the model **through your own `claude` CLI and login** (a few tenths of a cent per summary; no API key and no third-party service). Turn summaries off with **AI summary: off** in the panel footer (or `--no-ai` on Linux); Leftovers then falls back to simple rules.
 
-**iPhone sync** is off until you turn it on. It then stores session titles, open tasks, suggested replies and the last Claude message of sessions waiting on you in **your own private iCloud database**, readable only by your Apple Account; the developer cannot see it. Settled replies are deleted after 3 days, alerts after a day.
+## Configuration
 
-## Build from source
+Leftovers needs no configuration. These environment variables change its defaults:
+
+| Variable | Effect |
+| --- | --- |
+| `CLAUDE_CONFIG_DIR` | Claude Code's data directory, if it is not `~/.claude` (Linux, Windows) |
+| `CLAUDE_TODO_TERMINAL` / `TERMINAL` | Terminal used to open sessions (Linux) |
+| `CLAUDE_TODO_STATE` | Where cached summaries are stored (Linux, Windows) |
+| `LEFTOVERS_VERSION` | Release the installer installs |
+
+## Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| "AI summaries are missing" in the panel | Run `claude` once in a terminal and log in. |
+| A clicked task does nothing in Terminal or iTerm | Allow Leftovers under System Settings → Privacy & Security → Automation. |
+| `leftovers gui` reports a missing library (Linux) | Install the package it names, usually `sudo apt install libxcb-cursor0`. |
+| No tray icon on GNOME | Install the AppIndicator extension, or use the window directly. |
+| The widget shows old data | Open the menu bar panel once; the widget refreshes within a few seconds. |
+
+## Building from source
+
+macOS (needs Xcode 16 and [XcodeGen](https://github.com/yonaskolb/XcodeGen)):
 
 ```sh
 brew install xcodegen
-DEVELOPMENT_TEAM=<your team id> scripts/build_app.sh   # build/ClaudeTodo.app
-xcodegen && open ClaudeTodo.xcodeproj                   # iPhone: run the ClaudeTodoPhone scheme on your device
-TEAM_ID=<id> scripts/release.sh                         # signed, notarized DMG (needs a Developer ID certificate)
+DEVELOPMENT_TEAM=<team id> scripts/build_app.sh   # build/Leftovers.app
+TEAM_ID=<team id> scripts/release.sh              # signed, notarized build/release/Leftovers.dmg
 ```
 
-Change the bundle identifiers, the app group and the iCloud container (`iCloud.com.muhammederem.claude-todo`) in `project.yml` and `Shared/Cloud.swift` if you build it under your own team. The iPhone icon is drawn by `scripts/make_ios_icon.swift`.
+Linux and Windows:
+
+```sh
+cd cli
+python3 -m unittest discover -s . -t . -p "test_*.py"
+python3 -m claude_todo gui
+packaging/linux/build_deb.sh                      # from the repository root, on Debian/Ubuntu
+```
+
+If you build under your own Apple team, change the bundle identifiers in `project.yml`.
+
+### Repository layout
+
+| Path | Contents |
+| --- | --- |
+| `App/` | macOS menu bar app: scanner, analyzer, panel, terminal launcher |
+| `Widget/`, `Shared/` | WidgetKit extension and the views and models it shares with the app |
+| `cli/` | Python implementation for Linux and Windows (window, terminal panel, CLI) |
+| `packaging/linux/` | `.deb` build script and desktop entry |
+| `scripts/` | macOS build and release scripts |
+| `install.sh`, `install.ps1` | One-line installers |
 
 ## License
 
-MIT
+[MIT](LICENSE)

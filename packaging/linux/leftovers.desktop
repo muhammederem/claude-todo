@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Leftovers
+Comment=Unfinished work across your Claude Code sessions
+Exec=leftovers gui
+Icon=leftovers
+Terminal=false
+Categories=Development;Utility;
+Keywords=claude;todo;tasks;sessions;
+StartupWMClass=leftovers

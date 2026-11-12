@@ -53,7 +53,7 @@ def set_enabled(on: bool) -> None:
     if on:
         f.parent.mkdir(parents=True, exist_ok=True)
         exec_line = " ".join('"%s"' % a.replace('"', '\\"') if " " in a else a for a in _command())
-        f.write_text("[Desktop Entry]\nType=Application\nName=Claude To-Do\nComment=Open work across your Claude Code sessions\n"
+        f.write_text("[Desktop Entry]\nType=Application\nName=Leftovers\nComment=Open work across your Claude Code sessions\n"
                      f"Exec={exec_line}\nX-GNOME-Autostart-enabled=true\nTerminal=false\n")
     else:
         try:

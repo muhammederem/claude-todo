@@ -38,6 +38,20 @@ class Commands(unittest.TestCase):
         self.assertEqual(got[1], f"--resume {SID}")
         self.assertFalse(os.path.exists(os.path.join(nasty, "pwned")))
 
+    def test_task_prompt_reaches_claude_as_one_argument(self):
+        d = tempfile.mkdtemp()
+        prompt = "Fix the 'webhook' test; touch pwned\nsecond line $(id)"
+        argv = t.resume_command(SID, d, prompt=prompt, fork=True)
+        fake_bin(d, "claude", 'for a in "$@"; do echo "$a"; done > "$OUT"\n')
+        out = os.path.join(d, "out.txt")
+        env = {**os.environ, "PATH": d + os.pathsep + os.environ["PATH"], "OUT": out, "SHELL": "/usr/bin/true"}
+        import subprocess
+        r = subprocess.run(argv, env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=15)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(Path(out).read_text().splitlines(),
+                         ["--resume", SID, "--fork-session", "Fix the 'webhook' test; touch pwned second line $(id)"])
+        self.assertFalse(os.path.exists(os.path.join(d, "pwned")))
+
     def test_missing_cwd_falls_back_to_home(self):
         self.assertIn(shlex_home(), t.resume_command(SID, "/definitely/not/here")[2])
 

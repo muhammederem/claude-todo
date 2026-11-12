@@ -79,7 +79,8 @@ enum Snapshot {
     }
 }
 
-/// Widget links: `claudetodo://resume?id=<sessionId>` reopens a session; `claudetodo://reply?id=…&item=…`
+/// Widget links: `claudetodo://resume?id=<sessionId>` reopens a session; `claudetodo://task?id=…&item=…` sends that
+/// task to the session; `claudetodo://reply?id=…&item=…`
 /// sends the item's suggested reply, and with `&edit=1` opens it for editing first.
 final class URLHandler: NSObject, NSApplicationDelegate {
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -91,6 +92,12 @@ final class URLHandler: NSObject, NSApplicationDelegate {
             switch url.host {
             case "resume":
                 TodoStore.resume(sessionID: id, cwd: session?.cwd ?? "")
+            case "task":
+                guard let session, let item = session.items.first(where: { $0.id == value("item") }) else {
+                    TodoStore.resume(sessionID: id, cwd: session?.cwd ?? "")
+                    continue
+                }
+                Reply.task(session: session, item: item)
             case "reply":
                 guard let session, let item = session.items.first(where: { $0.id == value("item") }) else { continue }
                 MainActor.assumeIsolated {

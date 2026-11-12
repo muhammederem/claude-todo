@@ -1,4 +1,4 @@
-"""Entry point for `claude-todo-gui`: opens the window (and no console on Windows)."""
+"""Entry point for `leftovers-gui`: opens the window (and no console on Windows)."""
 import sys
 
 from .cli import main

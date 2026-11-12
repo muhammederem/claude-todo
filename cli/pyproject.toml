@@ -3,9 +3,9 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "claude-todo"
-version = "1.1.1"
-description = "What is still open across your Claude Code sessions: terminal panel and status-bar output"
+name = "leftovers"
+version = "1.2.0"
+description = "Leftovers: the unfinished work across your Claude Code sessions (window, tray icon, terminal panel, status-bar output)"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
@@ -15,10 +15,12 @@ dependencies = []
 gui = ["PySide6-Essentials>=6.5"]
 
 [project.gui-scripts]
-claude-todo-gui = "claude_todo.gui_entry:main_gui"
+leftovers-gui = "claude_todo.gui_entry:main_gui"
+claude-todo-gui = "claude_todo.gui_entry:main_gui"   # pre-rename name
 
 [project.scripts]
-claude-todo = "claude_todo.cli:main"
+leftovers = "claude_todo.cli:main"
+claude-todo = "claude_todo.cli:main"   # pre-rename name
 
 [tool.setuptools]
 packages = ["claude_todo"]

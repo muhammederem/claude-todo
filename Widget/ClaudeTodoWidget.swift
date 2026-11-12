@@ -26,7 +26,7 @@ struct ClaudeTodoWidget: Widget {
         StaticConfiguration(kind: "ClaudeTodoWidget", provider: TodoProvider()) { entry in
             TodoWidgetView(entry: entry)
         }
-        .configurationDisplayName("Claude To-Do")
+        .configurationDisplayName("Leftovers")
         .description("What is still unfinished in your Claude Code sessions, one tab per session.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }

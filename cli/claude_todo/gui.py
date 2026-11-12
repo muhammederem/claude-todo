@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel, QLineE
 from . import autostart, terminals
 from .analyzer import Analyzer
 from .build import MANUAL_ID, Hidden, Manual, Session, item_key
-from .cli import ago, collect, open_session
+from .cli import ago, collect, open_session, send_task
 from .scanner import Scanner
 
 GREEN, AMBER, TEXT, DIM = "#5CDB8F", "#FFB84D", "#EBEBEB", "#8A8F96"
@@ -74,6 +74,20 @@ def app_icon() -> QIcon:
     return QIcon(pm)
 
 
+class Clickable(QWidget):
+    """A task's text: a click sends the task to its session."""
+
+    def __init__(self, on_click):
+        super().__init__()
+        self.on_click = on_click
+        self.setCursor(Qt.PointingHandCursor)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.on_click()
+        super().mousePressEvent(event)
+
+
 class Panel(QWidget):
     def __init__(self, scanner: Scanner, analyzer: Optional[Analyzer], hidden: Hidden, manual: Manual):
         super().__init__()
@@ -83,7 +97,7 @@ class Panel(QWidget):
         self.notified = set()
         self.on_count = lambda count, you: None
         self.on_notify = lambda title, body: None
-        self.setWindowTitle("Claude To-Do")
+        self.setWindowTitle("Leftovers")
         self.resize(380, 560)
         self.setStyleSheet(STYLE)
 
@@ -233,7 +247,12 @@ class Panel(QWidget):
         icon.setStyleSheet(f"color: {AMBER if item.needs_you or item.status == 'in_progress' else GREEN}; font-size: 14px;")
         icon.setAlignment(Qt.AlignTop)
         h.addWidget(icon)
-        col = QVBoxLayout()
+        clickable = not manual and item.status != "completed"
+        box = Clickable(lambda it=item: self._send(s, it)) if clickable else QWidget()
+        if clickable:
+            box.setToolTip("Send this task to the session in a terminal")
+        col = QVBoxLayout(box)
+        col.setContentsMargins(0, 0, 0, 0)
         col.setSpacing(2)
         title = QLabel(item.content)
         title.setWordWrap(True)
@@ -244,7 +263,7 @@ class Panel(QWidget):
             d.setObjectName("dim")
             d.setWordWrap(True)
             col.addWidget(d)
-        h.addLayout(col, 1)
+        h.addWidget(box, 1)
         btn = QPushButton("✕" if manual else "✓")
         btn.setObjectName("done")
         btn.setToolTip("Delete" if manual else "Mark as done")
@@ -273,6 +292,12 @@ class Panel(QWidget):
             return
         try:
             self.state.setText(open_session(s))
+        except (RuntimeError, ValueError) as e:
+            self.state.setText(str(e))
+
+    def _send(self, s: Session, item):
+        try:
+            self.state.setText(send_task(s, item))
         except (RuntimeError, ValueError) as e:
             self.state.setText(str(e))
 
@@ -345,7 +370,7 @@ def make_tray(app: QApplication, panel: Panel) -> Optional[QSystemTrayIcon]:
 
     def update(count: int, you: bool):
         tray.setIcon(tray_icon(count, you))
-        tray.setToolTip(f"Claude To-Do: {count} waiting" if count else "Claude To-Do: all clear")
+        tray.setToolTip(f"Leftovers: {count} waiting" if count else "Leftovers: all clear")
     panel.on_count = update
     panel.on_notify = lambda title, body: tray.showMessage(title, body, QSystemTrayIcon.Information, 10000)
     panel.tray_active = True
@@ -357,8 +382,8 @@ def run(scanner: Scanner, analyzer: Optional[Analyzer], hidden: Hidden, manual: 
         smoke: Optional[str] = None) -> int:
     app = QApplication.instance() or QApplication(sys.argv[:1])
     app.setQuitOnLastWindowClosed(False)
-    app.setApplicationName("Claude To-Do")
-    app.setDesktopFileName("claude-todo")      # matches the .desktop file, so Wayland shows the right icon
+    app.setApplicationName("Leftovers")
+    app.setDesktopFileName("leftovers")      # matches the .desktop file, so Wayland shows the right icon
     panel = Panel(scanner, analyzer, hidden, manual)
     tray = make_tray(app, panel)
     app.setWindowIcon(app_icon())

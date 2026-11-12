@@ -7,33 +7,7 @@ struct TodoEntry: TimelineEntry {
     let state: WidgetState
     let selectedID: String?
     var cardKey: String? = nil
-    /// Cards already approved from the iPhone widget.
-    var sent: Set<String> = []
 }
-
-#if os(iOS)
-/// "Approve" on the iPhone widget: hands the suggested reply to the Mac through iCloud.
-struct ApproveReplyIntent: AppIntent {
-    static var title: LocalizedStringResource = "Approve suggested reply"
-
-    @Parameter(title: "Session") var sessionID: String
-    @Parameter(title: "Item") var itemID: String
-
-    init() {}
-    init(sessionID: String, itemID: String) {
-        self.sessionID = sessionID
-        self.itemID = itemID
-    }
-
-    func perform() async throws -> some IntentResult {
-        guard let session = SharedState.read()?.sessions.first(where: { $0.id == sessionID }),
-              let item = session.items.first(where: { $0.id == itemID }), !item.suggestion.isEmpty else { return .result() }
-        try await Cloud.sendReply(sessionID: sessionID, itemTitle: item.content, text: item.suggestion)
-        SharedState.markSent(sessionID + "|" + itemID)
-        return .result()
-    }
-}
-#endif
 
 /// The reply card: open items that come with an AI-suggested reply, across all tabs, yours first in each tab.
 struct ReplyCard {
@@ -136,11 +110,15 @@ enum Look {
     }
 
     static func resumeURL(_ id: String) -> URL? {
-        #if os(iOS)
-        URL(string: "claudetodo://session?id=\(id)")   // the phone can't resume; it opens that tab in the app
-        #else
         URL(string: "claudetodo://resume?id=\(id)")
-        #endif
+    }
+    /// A tap on a task: the app sends the task to its session.
+    static func taskURL(_ sessionID: String, _ itemID: String) -> URL? {
+        var c = URLComponents()
+        c.scheme = "claudetodo"
+        c.host = "task"
+        c.queryItems = [URLQueryItem(name: "id", value: sessionID), URLQueryItem(name: "item", value: itemID)]
+        return c.url
     }
     static func replyURL(_ card: ReplyCard, edit: Bool) -> URL? {
         var c = URLComponents()
@@ -193,51 +171,9 @@ struct TodoWidgetView: View {
     private var rowItems: [TodoItem] { openItems.filter { $0.id != card?.card.item.id } }
 
     var body: some View {
-        #if os(iOS)
-        if family == .accessoryRectangular || family == .accessoryInline || family == .accessoryCircular {
-            lockScreen
-        } else {
-            board
-        }
-        #else
         board
-        #endif
     }
 
-    #if os(iOS)
-    /// Lock Screen: what waits on you first, else the total.
-    @ViewBuilder private var lockScreen: some View {
-        let all = tabs.filter { $0.id != "manual" }
-        let open = all.flatMap { s in s.items.filter { $0.status != .completed }.map { (s, $0) } }
-        let mine = open.filter { $0.1.needsYou }
-        let top = mine.first ?? open.first
-        switch family {
-        case .accessoryInline:
-            Text(mine.isEmpty ? "\(open.count) waiting" : "\(mine.count) on you · \(top?.1.content ?? "")")
-                .containerBackground(for: .widget) { Color.clear }
-        case .accessoryCircular:
-            VStack(spacing: 0) {
-                Text("\(mine.isEmpty ? open.count : mine.count)").font(.system(size: 20, weight: .bold, design: .rounded))
-                Image(systemName: mine.isEmpty ? "checklist" : "hand.raised.fill").font(.system(size: 10))
-            }
-            .containerBackground(for: .widget) { AccessoryWidgetBackground() }
-        default:
-            VStack(alignment: .leading, spacing: 1) {
-                Text(mine.isEmpty ? "\(open.count) waiting" : "\(mine.count) on you")
-                    .font(.system(size: 12, weight: .semibold)).widgetAccentable()
-                if let top {
-                    Text(top.1.content).font(.system(size: 14, weight: .semibold)).lineLimit(1)
-                    Text(top.1.suggestion.isEmpty ? top.0.title : "→ " + top.1.suggestion).font(.system(size: 12)).lineLimit(1)
-                } else {
-                    Text("All clear").font(.system(size: 14, weight: .semibold))
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .containerBackground(for: .widget) { Color.clear }
-            .widgetURL(top.flatMap { Look.replyURL(ReplyCard(session: $0.0, item: $0.1), edit: true) })
-        }
-    }
-    #endif
 
     @ViewBuilder private var board: some View {
         let content = VStack(spacing: family == .systemMedium ? 5 : 8) {
@@ -316,14 +252,9 @@ struct TodoWidgetView: View {
         }
     }
 
-    #if os(iOS)
-    private static let tapVerb = "open it"
-    #else
-    private static let tapVerb = "resume"
-    #endif
 
     private var smallLabel: some View {
-        Text(selected?.title ?? "Claude To-Do").font(.system(size: 10, weight: .semibold))
+        Text(selected?.title ?? "Leftovers").font(.system(size: 10, weight: .semibold))
             .foregroundStyle(Look.dim).lineLimit(1).frame(maxWidth: .infinity)
     }
 
@@ -336,7 +267,7 @@ struct TodoWidgetView: View {
                 Text("+\(rowItems.count - rowLimit) more").font(.system(size: 10)).foregroundStyle(Look.dim)
             }
             if let s = selected, s.id != "manual", family == .systemLarge {
-                Text("Updated \(Look.ago(s.updatedAt)) · tap a task to \(Self.tapVerb)")
+                Text("Updated \(Look.ago(s.updatedAt)) · tap a task to send it")
                     .font(.system(size: 9.5)).foregroundStyle(Look.dim.opacity(0.8))
             }
         }
@@ -371,23 +302,8 @@ struct TodoWidgetView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Look.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 7))
             HStack(spacing: 6) {
-                if entry.sent.contains(card.key) {
-                    Label("Sent to your Mac", systemImage: "checkmark.circle.fill")
-                        .font(.system(size: 10.5, weight: .semibold)).foregroundStyle(Look.accent)
-                        .padding(.vertical, 4)
-                } else {
-                    #if os(iOS)
-                    if preview { cardLink("Approve", "checkmark", nil, primary: true) } else {
-                        Button(intent: ApproveReplyIntent(sessionID: card.session.id, itemID: item.id)) {
-                            cardLabel("Approve", "checkmark", primary: true)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    #else
-                    cardLink("Approve", "checkmark", Look.replyURL(card, edit: false), primary: true)
-                    #endif
-                    cardLink("Edit", "pencil", Look.replyURL(card, edit: true), primary: false)
-                }
+                cardLink("Approve", "checkmark", Look.replyURL(card, edit: false), primary: true)
+                cardLink("Edit", "pencil", Look.replyURL(card, edit: true), primary: false)
                 Spacer(minLength: 0)
             }
         }
@@ -441,12 +357,7 @@ struct TodoWidgetView: View {
             }
             Spacer(minLength: 0)
         }
-        #if os(iOS)
-        // on the phone a tap on a task opens a reply box for it
-        let link = selected.flatMap { s in s.id == "manual" ? nil : Look.replyURL(ReplyCard(session: s, item: item), edit: true) }
-        #else
-        let link = selected.flatMap { s in s.id == "manual" ? nil : Look.resumeURL(s.id) }
-        #endif
+        let link = selected.flatMap { s in s.id == "manual" ? nil : Look.taskURL(s.id, item.id) }
         if !preview, family != .systemSmall, let url = link {
             Link(destination: url) { content }
         } else {
